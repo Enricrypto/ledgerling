@@ -101,25 +101,23 @@ export class ServiceRegistry {
 // ---------------------------------------------------------------------------
 
 const BASE = {
-  ADEXAURA:       process.env.ADEXAURA_X402_URL      ?? "https://api.adexaura.com",
-  AIMONETWORK:    process.env.AIMONETWORK_X402_URL   ?? "https://api.aimo.network",
-  BLACKSWAN:      process.env.BLACKSWAN_X402_URL     ?? "https://api.blackswan.ai",
-  CYBERCENTRY:    process.env.CYBERCENTRY_X402_URL   ?? "https://api.cybercentry.ai",
-  DAYDREAMS:      process.env.DAYDREAMS_X402_URL     ?? "https://api.daydreams.ai",
-  DAPPLOOKER:     process.env.DAPPLOOKER_X402_URL    ?? "https://api.dapplooker.com",
-  DTELECOM:       process.env.DTELECOM_X402_URL      ?? "https://api.dtelecom.ai",
-  FIRECRAWL:      process.env.FIRECRAWL_X402_URL     ?? "https://api.firecrawl.dev",
-  GLORIA:         process.env.GLORIA_X402_URL        ?? "https://api.gloria.news",
-  IMFERENCE:      process.env.IMFERENCE_X402_URL     ?? "https://api.imference.ai",
-  MERCHANTGUARD:  process.env.MERCHANTGUARD_X402_URL ?? "https://api.merchantguard.io",
-  MINIFETCH:      process.env.MINIFETCH_X402_URL     ?? "https://api.minifetch.io",
-  MOLTBOOK:       process.env.MOLTBOOK_X402_URL      ?? "https://api.moltbook.ai",
-  PAIDLINKS:      process.env.PAIDLINKS_X402_URL     ?? "https://api.paidlinks.io",
-  PINATA:         process.env.PINATA_X402_URL        ?? "https://api.pinata.cloud",
-  SLAMAI:         process.env.SLAMAI_X402_URL        ?? "https://api.slam.ai",
-  TRUSTA:         process.env.TRUSTA_X402_URL        ?? "https://api.trusta.ai",
-  UTILITY10:      process.env.UTILITY10_X402_URL     ?? "https://api.utility10.com",
-  WALLETHOLDINGS: process.env.WALLETHOLDINGS_X402_URL ?? "https://api.wallet-holdings.io",
+  ADEXAURA:      process.env.ADEXAURA_X402_URL      ?? "https://aura.adex.network",
+  AIMONETWORK:   process.env.AIMONETWORK_X402_URL   ?? "https://api.aimo.network",
+  BLACKSWAN:     process.env.BLACKSWAN_X402_URL     ?? "https://x402.blackswan.wtf",
+  CYBERCENTRY:   process.env.CYBERCENTRY_X402_URL   ?? "https://api.cybercentry.ai",
+  DAYDREAMS:     process.env.DAYDREAMS_X402_URL     ?? "https://ai.xgate.run",
+  DAPPLOOKER:    process.env.DAPPLOOKER_X402_URL    ?? "https://api.dapplooker.com",
+  DTELECOM:      process.env.DTELECOM_X402_URL      ?? "https://x402stt.dtelecom.org",
+  FIRECRAWL:     process.env.FIRECRAWL_X402_URL     ?? "https://api.firecrawl.dev",
+  GLORIA:        process.env.GLORIA_X402_URL        ?? "https://api.gloria.news",
+  IMFERENCE:     process.env.IMFERENCE_X402_URL     ?? "https://imference.com",
+  MERCHANTGUARD: process.env.MERCHANTGUARD_X402_URL ?? "https://merchantguard.ai/api/v2/sentinela",
+  MINIFETCH:     process.env.MINIFETCH_X402_URL     ?? "https://minifetch.com",
+  MOLTBOOK:      process.env.MOLTBOOK_X402_URL      ?? "https://api.moltalyzer.xyz",
+  PINATA:        process.env.PINATA_X402_URL        ?? "https://api.pinata.cloud",
+  SLAMAI:        process.env.SLAMAI_X402_URL        ?? "https://api.slamai.dev",
+  TRUSTA:        process.env.TRUSTA_X402_URL        ?? "https://api.trusta.ai",
+  UTILITY10:     process.env.UTILITY10_X402_URL     ?? "https://api.utility10.com",
 }
 
 // ---------------------------------------------------------------------------
@@ -162,8 +160,8 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   Minifetch: {
-    url:           `${BASE.MINIFETCH}/v1/fetch`,
-    estimatedCost: 0.0050,
+    url:           `${BASE.MINIFETCH}/api/v1/x402/extract/url-content`,
+    estimatedCost: 0.0020,
     description:   "Lightweight URL fetch",
     inputSchemaHint: {
       url:      "Target URL to fetch",
@@ -211,8 +209,8 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   BlackSwan: {
-    url:           `${BASE.BLACKSWAN}/v1/crypto/news`,
-    estimatedCost: 0.0200,
+    url:           `${BASE.BLACKSWAN}/smart-agents/core`,
+    estimatedCost: 0.0300,
     description:   "Crypto news, market sentiment & risk signals",
     inputSchemaHint: {
       topic:    "Crypto asset, protocol, or market theme",
@@ -235,8 +233,8 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   Moltbook: {
-    url:           `${BASE.MOLTBOOK}/v1/feeds`,
-    estimatedCost: 0.0100,
+    url:           `${BASE.MOLTBOOK}/api/moltbook/digests/latest`,
+    estimatedCost: 0.0050,
     description:   "Structured news feed aggregation",
     inputSchemaHint: {
       topic:    "Feed topic or category",
@@ -260,7 +258,7 @@ export const defaultRegistry = new ServiceRegistry({
   // ── Crypto & DeFi ─────────────────────────────────────────────────────────
 
   SLAMai_Signals: {
-    url:           `${BASE.SLAMAI}/v1/smart-money/signals`,
+    url:           `${BASE.SLAMAI}/token/price`,
     estimatedCost: 0.0200,
     description:   "Smart-money & institutional on-chain signals",
     inputSchemaHint: {
@@ -284,7 +282,7 @@ export const defaultRegistry = new ServiceRegistry({
 
   SLAMai_WalletIntel: {
     // Canonical endpoint: /wallet/{address}/intel — address sent in POST body
-    url:           `${BASE.SLAMAI}/v1/wallet/intel`,
+    url:           `${BASE.SLAMAI}/api/wallet`,
     estimatedCost: 0.0200,
     description:   "Deep wallet behavioural intelligence",
     inputSchemaHint: {
@@ -307,7 +305,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   AdExAURA_Portfolio: {
-    url:           `${BASE.ADEXAURA}/v1/portfolio`,
+    url:           `${BASE.ADEXAURA}/api/x402/portfolio/balances`,
     estimatedCost: 0.0100,
     description:   "Crypto portfolio overview",
     inputSchemaHint: {
@@ -329,7 +327,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   AdExAURA_DefiPositions: {
-    url:           `${BASE.ADEXAURA}/v1/defi-positions`,
+    url:           `${BASE.ADEXAURA}/api/x402/portfolio/strategies`,
     estimatedCost: 0.0100,
     description:   "DeFi protocol positions (lending, liquidity, staking)",
     inputSchemaHint: {
@@ -373,30 +371,6 @@ export const defaultRegistry = new ServiceRegistry({
     },
     buildQuery: (raw, _ctx) => ({
       query: raw,
-    }),
-  },
-
-  WalletHoldings: {
-    url:           `${BASE.WALLETHOLDINGS}/v1/wallet/holdings`,
-    estimatedCost: 0.0100,
-    description:   "Wallet token holdings & balances",
-    inputSchemaHint: {
-      address: "EVM wallet address (0x...)",
-      chain:   "Optional chain ID or name (default: 'base')",
-    },
-    capability: "Crypto & DeFi",
-    classification: {
-      phrases: [
-        "wallet holdings", "token holdings", "wallet tokens",
-        "token balance", "wallet balance", "my tokens",
-        "check wallet tokens", "wallet token list", "what tokens do i hold",
-      ],
-      keywords: ["holdings", "tokens"],
-    },
-    buildQuery: (raw, ctx) => ({
-      address: ctx.walletAddresses[0] ?? null,
-      chain:   null,
-      query:   raw,
     }),
   },
 
@@ -455,7 +429,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   Imference: {
-    url:           `${BASE.IMFERENCE}/v1/run`,
+    url:           `${BASE.IMFERENCE}/ondemand/generate`,
     estimatedCost: 0.0500,
     description:   "AI image generation",
     inputSchemaHint: {
@@ -478,7 +452,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   DaydreamsRouter: {
-    url:           `${BASE.DAYDREAMS}/v1/llm/query`,
+    url:           `${BASE.DAYDREAMS}/v1/chat/completions`,
     estimatedCost: 0.0250,
     description:   "Multi-model LLM routing & complex reasoning",
     inputSchemaHint: {
@@ -501,8 +475,8 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   dTelecomSTT: {
-    url:           `${BASE.DTELECOM}/v1/stt`,
-    estimatedCost: 0.0200,
+    url:           `${BASE.DTELECOM}/v1/session`,
+    estimatedCost: 0.0250,
     description:   "Speech-to-text transcription",
     inputSchemaHint: {
       audioUrl: "Publicly accessible audio or video URL",
@@ -581,8 +555,8 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   MerchantGuard_Score: {
-    url:           `${BASE.MERCHANTGUARD}/v1/guardscore`,
-    estimatedCost: 0.0200,
+    url:           `${BASE.MERCHANTGUARD}/screen`,
+    estimatedCost: 0.0030,
     description:   "Fraud & chargeback risk score",
     inputSchemaHint: {
       query:      "Transaction or merchant description",
@@ -604,8 +578,8 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   MerchantGuard_Scan: {
-    url:           `${BASE.MERCHANTGUARD}/v1/guardscan`,
-    estimatedCost: 0.0250,
+    url:           `${BASE.MERCHANTGUARD}/batch`,
+    estimatedCost: 0.0030,
     description:   "Deep fraud detection scan",
     inputSchemaHint: {
       query:       "Transaction or activity description",
@@ -626,8 +600,8 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   MerchantGuard_MysteryShop: {
-    url:           `${BASE.MERCHANTGUARD}/v1/mystery-shopper`,
-    estimatedCost: 0.0500,
+    url:           `${BASE.MERCHANTGUARD}/screen`,
+    estimatedCost: 0.0030,
     description:   "Mystery-shopper compliance audit",
     inputSchemaHint: {
       targetUrl: "Merchant or checkout URL to audit",
@@ -717,56 +691,6 @@ export const defaultRegistry = new ServiceRegistry({
     buildQuery: (raw, _ctx) => ({
       cid:  null,
       hash: raw,
-    }),
-  },
-
-  PaidLinks_Create: {
-    url:           `${BASE.PAIDLINKS}/v1/link/create`,
-    estimatedCost: 0.0100,
-    description:   "Create a monetised x402 paid link",
-    inputSchemaHint: {
-      url:         "Destination URL to paywall",
-      price:       "Price in USD (float)",
-      description: "Optional link description shown to buyers",
-    },
-    capability: "Storage & Content",
-    classification: {
-      phrases: [
-        "paid link", "create paid link", "paywall link",
-        "monetize link", "payment link", "sell link",
-        "paid url", "paidlinks",
-      ],
-      keywords: [],
-    },
-    buildQuery: (raw, ctx) => ({
-      url:   ctx.urls[0] ?? null,
-      price: null,
-      query: raw,
-    }),
-  },
-
-  PaidLinks_Access: {
-    url:           `${BASE.PAIDLINKS}/v1/link/access`,
-    estimatedCost: 0.0050,
-    description:   "Access a paid link (triggers x402 payment)",
-    inputSchemaHint: {
-      linkId: "Paid link identifier returned by PaidLinks_Create",
-    },
-    capability: "Storage & Content",
-    classification: {
-      phrases: [
-        "access paid link", "access a paid link", "access the paid link",
-        "unlock paid link", "unlock a paid link", "unlock the paid link",
-        "unlock this link", "unlock the link",
-        "pay to access", "pay to view",
-        "open paid link", "paid content access", "access paywalled",
-        "unlock link",
-      ],
-      keywords: [],
-    },
-    buildQuery: (raw, _ctx) => ({
-      linkId: null,
-      query:  raw,
     }),
   },
 

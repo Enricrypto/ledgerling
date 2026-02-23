@@ -137,11 +137,11 @@ Probing 27 services (timeout: 8s each)…
 
 **Status tiers:**
 
-| Icon | Tier | Meaning |
-|---|---|---|
-| ✅ | `live` | HTTP 2xx or 402 — service is up and enforcing x402 |
-| ⚠ | `endpoint_err` | Server responded but URL or auth is wrong (4xx ≠ 402, or 5xx) |
-| ❌ | `unreachable` | Network error or timeout — couldn't reach the server |
+| Icon | Tier           | Meaning                                                       |
+| ---- | -------------- | ------------------------------------------------------------- |
+| ✅   | `live`         | HTTP 2xx or 402 — service is up and enforcing x402            |
+| ⚠    | `endpoint_err` | Server responded but URL or auth is wrong (4xx ≠ 402, or 5xx) |
+| ❌   | `unreachable`  | Network error or timeout — couldn't reach the server          |
 
 A **402** response is the expected healthy status for an x402 service — it means the service is live and correctly gating access behind a micropayment. You need a funded wallet to get a 200.
 
@@ -276,15 +276,15 @@ The default `src/index.ts` calls a single x402 endpoint using `buildFetchWithPay
 
 ## Supported services
 
-| Capability | Services |
-|---|---|
-| Research & Web | Firecrawl, Minifetch |
-| Market & News | GloriaAI, BlackSwan, Moltbook |
-| Crypto & DeFi | SLAMai_Signals, SLAMai_WalletIntel, AdExAURA_Portfolio, AdExAURA_DefiPositions, DappLooker, WalletHoldings |
-| AI & Media | AiMoNetwork_LLM, AiMoNetwork_Market, Imference, DaydreamsRouter, dTelecomSTT |
+| Capability            | Services                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Research & Web        | Firecrawl, Minifetch                                                                                          |
+| Market & News         | GloriaAI, BlackSwan, Moltbook                                                                                 |
+| Crypto & DeFi         | SLAMai_Signals, SLAMai_WalletIntel, AdExAURA_Portfolio, AdExAURA_DefiPositions, DappLooker,                   |
+| AI & Media            | AiMoNetwork_LLM, AiMoNetwork_Market, Imference, DaydreamsRouter, dTelecomSTT                                  |
 | Security & Compliance | Cybercentry_URL, Cybercentry_IP, MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop, TrustaAI |
-| Storage & Content | PinataIPFS_Upload, PinataIPFS_Get, PaidLinks_Create, PaidLinks_Access |
-| Utility | Utility10 |
+| Storage & Content     | PinataIPFS_Upload, PinataIPFS_Get                                                                             |
+| Utility               | Utility10                                                                                                     |
 
 27 services total across 7 capability groups.
 
@@ -301,24 +301,24 @@ const result: PipelineResult = await runPipeline(
   "get ETH price and generate a chart",
   fetchFn,
   {
-    dryRun: false,              // true = estimate only, no charges
+    dryRun: false, // true = estimate only, no charges
     continueOnUnhealthy: false, // true = proceed even if a service is down
-    stepTimeoutMs: 30_000,      // per-step timeout (0 = disabled)
-    registry,                   // optional custom ServiceRegistry
+    stepTimeoutMs: 30_000, // per-step timeout (0 = disabled)
+    registry // optional custom ServiceRegistry
   }
 )
 ```
 
 `PipelineResult` fields:
 
-| Field | Type | Description |
-|---|---|---|
-| `query` | `string` | The original user query |
-| `classification` | `ClassificationResult` | Classifier output |
-| `estimation` | `OrchestratorEstimation` | Preflight cost + health |
-| `execution` | `OrchestratorResult` | Execution results (absent on dryRun/abort) |
-| `dryRun` | `boolean` | Whether execution was skipped |
-| `abortedReason` | `string?` | Why execution was skipped (out-of-scope, unhealthy, etc.) |
+| Field            | Type                     | Description                                               |
+| ---------------- | ------------------------ | --------------------------------------------------------- |
+| `query`          | `string`                 | The original user query                                   |
+| `classification` | `ClassificationResult`   | Classifier output                                         |
+| `estimation`     | `OrchestratorEstimation` | Preflight cost + health                                   |
+| `execution`      | `OrchestratorResult`     | Execution results (absent on dryRun/abort)                |
+| `dryRun`         | `boolean`                | Whether execution was skipped                             |
+| `abortedReason`  | `string?`                | Why execution was skipped (out-of-scope, unhealthy, etc.) |
 
 ---
 
@@ -350,15 +350,15 @@ Atomic sequential execution. Halts on first failure and reports exactly what was
 ```typescript
 const result = await executeSteps(steps, fetchFn, {
   stepTimeoutMs: 15_000,
-  registry,
+  registry
 })
 
 if (result.success) {
-  console.log(result.uxMessage)       // "All 2 steps completed successfully."
-  console.log(result.totalCost)       // actual USD from x402 receipts
+  console.log(result.uxMessage) // "All 2 steps completed successfully."
+  console.log(result.totalCost) // actual USD from x402 receipts
 } else {
-  console.error(result.uxMessage)     // includes charge notice for prior steps
-  console.error(result.failedStep)    // which step failed
+  console.error(result.uxMessage) // includes charge notice for prior steps
+  console.error(result.failedStep) // which step failed
 }
 ```
 
@@ -385,22 +385,25 @@ const { inScope, steps, fallbackMessage } = classifyRequest(
 The classifier is fully registry-driven — every service carries its own `classification` phrases, keywords, and `buildQuery` function inside its `ServiceConfig`. Adding a new service requires only one file edit.
 
 ```typescript
-import { ServiceRegistry, defaultRegistry } from "./src/registry/serviceRegistry.js"
+import {
+  ServiceRegistry,
+  defaultRegistry
+} from "./src/registry/serviceRegistry.js"
 import type { MatchContext } from "./src/classifier/types.js"
 
 // Extend the default registry with a new x402 service
 const registry = defaultRegistry.clone()
 registry.register("MyService", {
-  url:           "https://api.myservice.io/v1/run",
+  url: "https://api.myservice.io/v1/run",
   estimatedCost: 0.05,
-  description:   "My custom x402 service",
+  description: "My custom x402 service",
   inputSchemaHint: { query: "Input query" },
-  capability:    "Utility",
+  capability: "Utility",
   classification: {
-    phrases:  ["my service", "run myservice"],
-    keywords: ["myservice"],
+    phrases: ["my service", "run myservice"],
+    keywords: ["myservice"]
   },
-  buildQuery: (raw: string, _ctx: MatchContext) => ({ query: raw }),
+  buildQuery: (raw: string, _ctx: MatchContext) => ({ query: raw })
 })
 
 await runPipeline(query, fetchFn, { registry })
@@ -408,16 +411,16 @@ await runPipeline(query, fetchFn, { registry })
 
 `ServiceConfig` fields:
 
-| Field | Type | Description |
-|---|---|---|
-| `url` | `string` | POST endpoint for the x402 service |
-| `estimatedCost` | `number` | USD cost hint for preflight estimates |
-| `description` | `string` | Human-readable label shown in UX summaries |
-| `inputSchemaHint` | `Record<string, string>` | Documents expected POST body fields |
-| `capability` | `Capability` | Which capability group this service belongs to |
-| `classification.phrases` | `string[]` | Multi-word or unambiguous single-term triggers (3 pts each) |
-| `classification.keywords` | `string[]` | Supporting single-word signals (1 pt each; 2 pts required to match) |
-| `buildQuery` | `(raw, ctx) => object` | Builds the POST body from the user query and extracted entities |
+| Field                     | Type                     | Description                                                         |
+| ------------------------- | ------------------------ | ------------------------------------------------------------------- |
+| `url`                     | `string`                 | POST endpoint for the x402 service                                  |
+| `estimatedCost`           | `number`                 | USD cost hint for preflight estimates                               |
+| `description`             | `string`                 | Human-readable label shown in UX summaries                          |
+| `inputSchemaHint`         | `Record<string, string>` | Documents expected POST body fields                                 |
+| `capability`              | `Capability`             | Which capability group this service belongs to                      |
+| `classification.phrases`  | `string[]`               | Multi-word or unambiguous single-term triggers (3 pts each)         |
+| `classification.keywords` | `string[]`               | Supporting single-word signals (1 pt each; 2 pts required to match) |
+| `buildQuery`              | `(raw, ctx) => object`   | Builds the POST body from the user query and extracted entities     |
 
 `MatchContext` (passed to `buildQuery`) contains extracted entities from the query: `urls`, `walletAddresses`, `ipAddresses`, `cryptoSymbols`, and the original `raw` string.
 
@@ -427,12 +430,12 @@ await runPipeline(query, fetchFn, { registry })
 
 `classifyError(err)` maps any raw error string to a typed `ErrorKind`:
 
-| Kind | Trigger | Charge status |
-|---|---|---|
-| `TIMEOUT` | Request exceeded `stepTimeoutMs` | Ambiguous — see receipt |
-| `NETWORK_ERROR` | DNS/connection failure | Not charged |
-| `PAYMENT_FAILED` | 402 rejected / insufficient balance | Not charged |
-| `SERVICE_ERROR` | Service returned a failure | Not charged |
+| Kind             | Trigger                             | Charge status           |
+| ---------------- | ----------------------------------- | ----------------------- |
+| `TIMEOUT`        | Request exceeded `stepTimeoutMs`    | Ambiguous — see receipt |
+| `NETWORK_ERROR`  | DNS/connection failure              | Not charged             |
+| `PAYMENT_FAILED` | 402 rejected / insufficient balance | Not charged             |
+| `SERVICE_ERROR`  | Service returned a failure          | Not charged             |
 
 `uxMessageForError(kind, service)` returns a plain-English sentence safe to show users.
 
@@ -477,41 +480,39 @@ X402_TEST_URL=https://your-x402-server.io/api LIVE_TEST=1 npm run test:live
 
 ## Environment variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `OPENFORT_SECRET_KEY` | One of the two | OpenFort TEE backend wallet key |
-| `EVM_PRIVATE_KEY` | One of the two | Raw EVM private key (dev only) |
-| `CHAIN_ID` | No | `84532` (Base Sepolia, default) or `8453` (Base mainnet) |
-| `RPC_URL` | No | Custom RPC endpoint for the selected chain |
-| `LOG_FORMAT` | No | Set to `json` for newline-delimited JSON logs |
-| `LIVE_TEST` | No | Set to `1` to run live integration tests |
-| `X402_TEST_URL` | No | x402 endpoint for live tests (default: `https://x402index.com/api/all`) |
+| Variable              | Required       | Description                                                             |
+| --------------------- | -------------- | ----------------------------------------------------------------------- |
+| `OPENFORT_SECRET_KEY` | One of the two | OpenFort TEE backend wallet key                                         |
+| `EVM_PRIVATE_KEY`     | One of the two | Raw EVM private key (dev only)                                          |
+| `CHAIN_ID`            | No             | `84532` (Base Sepolia, default) or `8453` (Base mainnet)                |
+| `RPC_URL`             | No             | Custom RPC endpoint for the selected chain                              |
+| `LOG_FORMAT`          | No             | Set to `json` for newline-delimited JSON logs                           |
+| `LIVE_TEST`           | No             | Set to `1` to run live integration tests                                |
+| `X402_TEST_URL`       | No             | x402 endpoint for live tests (default: `https://x402index.com/api/all`) |
 
 ### Service proxy URLs
 
 Each service has an optional `*_X402_URL` environment variable that overrides its default host. Set these to point a service at a real x402 proxy (e.g. foldset.xyz, zauthx402.com) once you have verified endpoints. Without them, the placeholder hosts remain in place and `npm run diagnose` will report `ENOTFOUND`.
 
-| Variable | Service(s) |
-|---|---|
-| `FIRECRAWL_X402_URL` | Firecrawl |
-| `MINIFETCH_X402_URL` | Minifetch |
-| `GLORIA_X402_URL` | GloriaAI |
-| `BLACKSWAN_X402_URL` | BlackSwan |
-| `MOLTBOOK_X402_URL` | Moltbook |
-| `SLAMAI_X402_URL` | SLAMai_Signals, SLAMai_WalletIntel |
-| `ADEXAURA_X402_URL` | AdExAURA_Portfolio, AdExAURA_DefiPositions |
-| `DAPPLOOKER_X402_URL` | DappLooker |
-| `WALLETHOLDINGS_X402_URL` | WalletHoldings |
-| `AIMONETWORK_X402_URL` | AiMoNetwork_LLM, AiMoNetwork_Market |
-| `IMFERENCE_X402_URL` | Imference |
-| `DAYDREAMS_X402_URL` | DaydreamsRouter |
-| `DTELECOM_X402_URL` | dTelecomSTT |
-| `CYBERCENTRY_X402_URL` | Cybercentry_URL, Cybercentry_IP |
+| Variable                 | Service(s)                                                         |
+| ------------------------ | ------------------------------------------------------------------ |
+| `FIRECRAWL_X402_URL`     | Firecrawl                                                          |
+| `MINIFETCH_X402_URL`     | Minifetch                                                          |
+| `GLORIA_X402_URL`        | GloriaAI                                                           |
+| `BLACKSWAN_X402_URL`     | BlackSwan                                                          |
+| `MOLTBOOK_X402_URL`      | Moltbook                                                           |
+| `SLAMAI_X402_URL`        | SLAMai_Signals, SLAMai_WalletIntel                                 |
+| `ADEXAURA_X402_URL`      | AdExAURA_Portfolio, AdExAURA_DefiPositions                         |
+| `DAPPLOOKER_X402_URL`    | DappLooker                                                         |
+| `AIMONETWORK_X402_URL`   | AiMoNetwork_LLM, AiMoNetwork_Market                                |
+| `IMFERENCE_X402_URL`     | Imference                                                          |
+| `DAYDREAMS_X402_URL`     | DaydreamsRouter                                                    |
+| `DTELECOM_X402_URL`      | dTelecomSTT                                                        |
+| `CYBERCENTRY_X402_URL`   | Cybercentry_URL, Cybercentry_IP                                    |
 | `MERCHANTGUARD_X402_URL` | MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop |
-| `TRUSTA_X402_URL` | TrustaAI |
-| `PINATA_X402_URL` | PinataIPFS_Upload, PinataIPFS_Get |
-| `PAIDLINKS_X402_URL` | PaidLinks_Create, PaidLinks_Access |
-| `UTILITY10_X402_URL` | Utility10 |
+| `TRUSTA_X402_URL`        | TrustaAI                                                           |
+| `PINATA_X402_URL`        | PinataIPFS_Upload, PinataIPFS_Get                                  |
+| `UTILITY10_X402_URL`     | Utility10                                                          |
 
 To activate a service, add the variable to `.env` and restart:
 

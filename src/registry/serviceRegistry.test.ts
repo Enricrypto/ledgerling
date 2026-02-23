@@ -1,4 +1,8 @@
-import { ServiceRegistry, defaultRegistry, type ServiceConfig } from "./serviceRegistry.js"
+import {
+  ServiceRegistry,
+  defaultRegistry,
+  type ServiceConfig
+} from "./serviceRegistry.js"
 
 const SAMPLE: ServiceConfig = {
   url: "https://api.example.com/v1/test",
@@ -7,7 +11,7 @@ const SAMPLE: ServiceConfig = {
   inputSchemaHint: { query: "Test query field" },
   capability: "Research & Web",
   classification: { phrases: ["test phrase"], keywords: ["test"] },
-  buildQuery: (raw, _ctx) => ({ query: raw }),
+  buildQuery: (raw, _ctx) => ({ query: raw })
 }
 
 const SAMPLE_B: ServiceConfig = {
@@ -17,7 +21,7 @@ const SAMPLE_B: ServiceConfig = {
   inputSchemaHint: { query: "Test query field" },
   capability: "Market & News",
   classification: { phrases: ["test phrase b"], keywords: ["testb"] },
-  buildQuery: (raw, _ctx) => ({ query: raw }),
+  buildQuery: (raw, _ctx) => ({ query: raw })
 }
 
 // ---------------------------------------------------------------------------
@@ -220,8 +224,8 @@ describe("ServiceRegistry — clone", () => {
 // ---------------------------------------------------------------------------
 
 describe("defaultRegistry — built-in services", () => {
-  test("contains all 27 built-in services", () => {
-    expect(defaultRegistry.size).toBe(27)
+  test("contains all 24 built-in services", () => {
+    expect(defaultRegistry.size).toBe(24)
   })
 
   test("contains all Research & Web services", () => {
@@ -236,25 +240,44 @@ describe("defaultRegistry — built-in services", () => {
   })
 
   test("contains all Crypto & DeFi services", () => {
-    for (const s of ["SLAMai_Signals", "SLAMai_WalletIntel", "AdExAURA_Portfolio", "AdExAURA_DefiPositions", "DappLooker", "WalletHoldings"]) {
+    for (const s of [
+      "SLAMai_Signals",
+      "SLAMai_WalletIntel",
+      "AdExAURA_Portfolio",
+      "AdExAURA_DefiPositions",
+      "DappLooker"
+    ]) {
       expect(defaultRegistry.has(s)).toBe(true)
     }
   })
 
   test("contains all AI & Media services", () => {
-    for (const s of ["AiMoNetwork_LLM", "AiMoNetwork_Market", "Imference", "DaydreamsRouter", "dTelecomSTT"]) {
+    for (const s of [
+      "AiMoNetwork_LLM",
+      "AiMoNetwork_Market",
+      "Imference",
+      "DaydreamsRouter",
+      "dTelecomSTT"
+    ]) {
       expect(defaultRegistry.has(s)).toBe(true)
     }
   })
 
   test("contains all Security & Compliance services", () => {
-    for (const s of ["Cybercentry_URL", "Cybercentry_IP", "MerchantGuard_Score", "MerchantGuard_Scan", "MerchantGuard_MysteryShop", "TrustaAI"]) {
+    for (const s of [
+      "Cybercentry_URL",
+      "Cybercentry_IP",
+      "MerchantGuard_Score",
+      "MerchantGuard_Scan",
+      "MerchantGuard_MysteryShop",
+      "TrustaAI"
+    ]) {
       expect(defaultRegistry.has(s)).toBe(true)
     }
   })
 
   test("contains all Storage & Content services", () => {
-    for (const s of ["PinataIPFS_Upload", "PinataIPFS_Get", "PaidLinks_Create", "PaidLinks_Access"]) {
+    for (const s of ["PinataIPFS_Upload", "PinataIPFS_Get"]) {
       expect(defaultRegistry.has(s)).toBe(true)
     }
   })
