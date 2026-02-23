@@ -136,7 +136,8 @@ async function probe(service: string): Promise<ServiceHealth> {
     }
   } catch (postErr: any) {
     const isPostTimeout = postErr.name === "TimeoutError" || postErr.name === "AbortError"
-    const msg: string = postErr.message ?? String(postErr)
+    const cause: string | undefined = postErr.cause?.message ?? postErr.cause?.code
+    const msg: string = cause ?? postErr.message ?? String(postErr)
     return {
       service,
       capability: config.capability,
@@ -259,6 +260,11 @@ async function main(): Promise<void> {
   // Exit 1 only for hard unreachable — endpoint errors are informational
   process.exit(unreach.length > 0 ? 1 : 0)
 }
+
+// Gracefully handle broken pipes (e.g. `... | jq ... | head`)
+process.stdout.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EPIPE") process.exit(0)
+})
 
 main().catch((err) => {
   process.stderr.write(`\nFatal: ${err.message}\n`)
