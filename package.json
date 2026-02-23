@@ -1,0 +1,37 @@
+{
+  "name": "ledgerling",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "npx tsx src/index.ts",
+    "cli": "npx tsx src/cli.ts",
+    "diagnose": "npx tsx src/diagnose.ts",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:live": "LIVE_TEST=1 node --experimental-vm-modules node_modules/.bin/jest src/e2e"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^25.3.0",
+    "@types/node-fetch": "^2.6.13",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@openfort/openfort-node": "^0.8.2",
+    "@x402/axios": "^2.4.0",
+    "@x402/core": "^2.4.0",
+    "@x402/evm": "^2.4.0",
+    "@x402/extensions": "^2.4.0",
+    "@x402/fetch": "^2.4.0",
+    "axios": "^1.13.5",
+    "dotenv": "^17.3.1",
+    "viem": "^2.46.2"
+  }
+}
