@@ -41,15 +41,17 @@ src/
 │   ├── classifier.ts        # classifyRequest() — NLP → TaskStep[]
 │   └── types.ts             # MatchContext — shared type for classifier + registry
 ├── registry/
-│   └── serviceRegistry.ts   # ServiceRegistry class + defaultRegistry (27 services)
+│   └── serviceRegistry.ts   # ServiceRegistry class + defaultRegistry (17 active services)
 ├── capabilities/
-│   └── capabilities.ts      # CapabilityRegistry — 7 capability groups
+│   └── capabilities.ts      # CapabilityRegistry — 6 active capability groups
 ├── services/
 │   ├── fetchWithPayment.ts  # buildFetchWithPayment() — x402-enabled fetch factory
 │   └── openfortSigner.ts    # OpenFort TEE backend wallet adapter
 ├── utils/
 │   ├── logger.ts             # Structured logger (human / JSON)
 │   └── errorHandling.ts      # classifyError(), uxMessageForError()
+├── cli.ts                    # Interactive CLI — wallet detection + payment pipeline
+├── diagnose.ts               # Service health prober
 └── e2e/
     └── integration.test.ts   # Live integration tests (gated by LIVE_TEST=1)
 ```
@@ -104,22 +106,29 @@ There are three entry points. No wallet is needed for the first two.
 
 ### `npm run diagnose` — check which services are reachable
 
-Probes all 27 registered x402 endpoints and classifies each result. No charges are incurred.
+Probes all 17 registered x402 endpoints and classifies each result. No charges are incurred.
 
 ```bash
+# Probe all services (no wallet needed)
 npm run diagnose
+
+# Check wallet address and balances only
+npm run diagnose -- --wallet
+
+# Machine-readable JSON output
+npm run diagnose -- --json
 ```
 
 Expected output:
 
 ```
 Ledgerling — Service Diagnostic
-Probing 27 services (timeout: 8s each)…
+Probing 17 services (timeout: 8s each)…
 
   ── Research & Web ────────────────────────────────────
   Service                    Status    HTTP   Latency   Diagnosis
   ─────────────────────────────────────────────────────────────────────────
-  Firecrawl                  ✅  live  404    312ms     Not found — endpoint URL may differ in production
+  Firecrawl                  ✅  live  402    312ms     x402 payment required — service is live; use a funded wallet to call it
   Minifetch                  ✅  live  402    198ms     x402 payment required — service is live; use a funded wallet to call it
 
   ── Crypto & DeFi ─────────────────────────────────────
@@ -129,10 +138,10 @@ Probing 27 services (timeout: 8s each)…
   ...
 
 ────────────────────────────────────────────────────────────
-  Total services          : 27
-  ✅  Live                : 18
-  ⚠   Endpoint errors     : 6
-  ❌  Unreachable/timeout  : 3
+  Total services          : 17
+  ✅  Live                : 14
+  ⚠   Endpoint errors     : 2
+  ❌  Unreachable/timeout  : 1
 ```
 
 **Status tiers:**
@@ -145,7 +154,24 @@ Probing 27 services (timeout: 8s each)…
 
 A **402** response is the expected healthy status for an x402 service — it means the service is live and correctly gating access behind a micropayment. You need a funded wallet to get a 200.
 
-Machine-readable output (safe to pipe to `jq`):
+#### `--wallet` mode — check balances without probing services
+
+```bash
+npm run diagnose -- --wallet
+```
+
+```
+🚀 WALLET MODE ACTIVE
+💳 Address: 0xYourWalletAddress
+⛽  Chain:  84532
+⛽ ETH Balance: 0.042 ETH
+💰 USDC Balance: 10.00 USDC
+✅ Wallet ready - x402 payments would work here
+```
+
+Requires `EVM_PRIVATE_KEY` and `CHAIN_ID` in `.env`.
+
+#### JSON output (safe to pipe to `jq`)
 
 ```bash
 npm run diagnose -- --json
@@ -157,7 +183,7 @@ npm run diagnose -- --json | jq '[.[] | select(.statusCode == 402)] | length'
 
 ### `npm run cli` — interactive payment pipeline
 
-Runs the full classify → estimate → confirm → execute flow in your terminal. No charges until you explicitly confirm.
+Runs the full wallet detection → classify → estimate → confirm → execute flow in your terminal. No charges until you explicitly confirm.
 
 ```bash
 # Interactive prompt
@@ -170,10 +196,27 @@ npm run cli "scrape https://example.com"
 npm run cli -- --dry-run "get the latest ETH and BTC prices"
 ```
 
-#### What you'll see — dry-run (no wallet needed)
+#### CLI flow
+
+When you run the CLI, it always:
+
+1. **Detects your wallet** — reads `EVM_PRIVATE_KEY` + `CHAIN_ID` from `.env`, connects to the RPC, and shows your ETH and USDC balances.
+2. **Accepts a query** — inline arg or interactive prompt.
+3. **Classifies** — maps the query to one or more service steps.
+4. **Preflight estimate** — health-checks each service and shows cost breakdown (no charge).
+5. **Confirms** — asks `Proceed and authorise payment? (y/N)`. You can abort here.
+6. **Executes** — pays each step atomically via x402. Halts and reports if any step fails.
+
+#### What you'll see — startup + dry-run
 
 ```
-🔗  Ledgerling — x402 payment pipeline
+🔗 Ledgerling — x402 payment pipeline
+
+🚀 Wallet detected:
+💳 Address: 0xYourAddress
+⛽ Chain: 84532
+⛽ ETH Balance: 0.042 ETH
+💰 USDC Balance: 10.00 USDC
 
   Query: get the latest ETH and BTC prices
 
@@ -183,9 +226,9 @@ npm run cli -- --dry-run "get the latest ETH and BTC prices"
  Execution plan
 ────────────────────────────────────────────────────────────
 Ledgerling will execute 1 step:
-  1. AiMoNetwork_Market — AI-augmented crypto & financial market data (~$0.0200)
+  1. BlackSwan — Crypto news, market sentiment & risk signals (~$0.0300)
 
-Estimated total: ~$0.0200 USD
+Estimated total: ~$0.0300 USD
 
   --dry-run flag set. No charges were incurred.
 ```
@@ -193,7 +236,13 @@ Estimated total: ~$0.0200 USD
 #### What you'll see — full execution (funded wallet required)
 
 ```
-🔗  Ledgerling — x402 payment pipeline
+🔗 Ledgerling — x402 payment pipeline
+
+🚀 Wallet detected:
+💳 Address: 0xYourAddress
+⛽ Chain: 84532
+⛽ ETH Balance: 0.042 ETH
+💰 USDC Balance: 10.00 USDC
 
   Query: scrape https://example.com
 
@@ -209,7 +258,6 @@ Estimated total: ~$0.0100 USD
 
   Proceed and authorise payment? (y/N): y
 
-  Initialising wallet…
   Executing steps…
 
 ────────────────────────────────────────────────────────────
@@ -241,7 +289,6 @@ Ledgerling currently supports:
 • AI inference, image generation & transcription
 • Security scanning & compliance
 • IPFS storage & paid links
-• General utility tasks
 Your request doesn't match available paid services yet.
 ```
 
@@ -254,10 +301,10 @@ npm run cli -- --dry-run "scrape https://example.com and summarize it"
 
 # Single-service
 npm run cli -- --dry-run "upload a file to IPFS"
-npm run cli -- --dry-run "check if 8.8.8.8 is malicious"
 npm run cli -- --dry-run "transcribe https://audio.example.com/clip.mp3"
-npm run cli -- --dry-run "run a KYC check"
 npm run cli -- --dry-run "generate an image of a futuristic city"
+npm run cli -- --dry-run "check wallet intel for 0xAbCd..."
+npm run cli -- --dry-run "show my DeFi positions"
 ```
 
 ---
@@ -276,17 +323,16 @@ The default `src/index.ts` calls a single x402 endpoint using `buildFetchWithPay
 
 ## Supported services
 
-| Capability            | Services                                                                                                      |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Research & Web        | Firecrawl, Minifetch                                                                                          |
-| Market & News         | GloriaAI, BlackSwan, Moltbook                                                                                 |
-| Crypto & DeFi         | SLAMai_Signals, SLAMai_WalletIntel, AdExAURA_Portfolio, AdExAURA_DefiPositions, DappLooker,                   |
-| AI & Media            | AiMoNetwork_LLM, AiMoNetwork_Market, Imference, DaydreamsRouter, dTelecomSTT                                  |
-| Security & Compliance | Cybercentry_URL, Cybercentry_IP, MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop, TrustaAI |
-| Storage & Content     | PinataIPFS_Upload, PinataIPFS_Get                                                                             |
-| Utility               | Utility10                                                                                                     |
+| Capability            | Services                                                                          |
+| --------------------- | --------------------------------------------------------------------------------- |
+| Research & Web        | Firecrawl, Minifetch                                                              |
+| Market & News         | BlackSwan, Moltbook                                                               |
+| Crypto & DeFi         | SLAMai_Signals, SLAMai_WalletIntel, AdExAURA_Portfolio, AdExAURA_DefiPositions, DappLooker |
+| AI & Media            | Imference, DaydreamsRouter, dTelecomSTT                                           |
+| Security & Compliance | MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop                |
+| Storage & Content     | PinataIPFS_Upload, PinataIPFS_Get                                                 |
 
-27 services total across 7 capability groups.
+17 services total across 6 capability groups.
 
 ---
 
@@ -332,9 +378,9 @@ const est = await estimateExecution(steps)
 console.log(est.uxSummary)
 // Ledgerling will execute 2 steps:
 //   1. Firecrawl — Web scraping & crawling (~$0.0100)
-//   2. GloriaAI — General news query (~$0.0150)
+//   2. BlackSwan — Crypto news, market sentiment & risk signals (~$0.0300)
 //
-// Estimated total: ~$0.0250 USD
+// Estimated total: ~$0.0400 USD
 
 if (!est.healthy) {
   console.warn("Unavailable services:", est.unavailableServices)
@@ -373,8 +419,8 @@ const { inScope, steps, fallbackMessage } = classifyRequest(
   "get the ETH price and check for fraudulent activity on 0xAbCd..."
 )
 // steps = [
-//   { capability: "AI & Media", service: "AiMoNetwork_Market", query: { query: "...", symbols: ["eth"] } },
-//   { capability: "Security & Compliance", service: "MerchantGuard_Score", query: { query: "..." } },
+//   { capability: "Market & News", service: "BlackSwan", query: { topic: "..." } },
+//   { capability: "Security & Compliance", service: "MerchantGuard_Score", query: { message: "..." } },
 // ]
 ```
 
@@ -486,33 +532,29 @@ X402_TEST_URL=https://your-x402-server.io/api LIVE_TEST=1 npm run test:live
 | `EVM_PRIVATE_KEY`     | One of the two | Raw EVM private key (dev only)                                          |
 | `CHAIN_ID`            | No             | `84532` (Base Sepolia, default) or `8453` (Base mainnet)                |
 | `RPC_URL`             | No             | Custom RPC endpoint for the selected chain                              |
+| `USDC_ADDRESS`        | No             | USDC contract address on the selected chain (for balance display)       |
 | `LOG_FORMAT`          | No             | Set to `json` for newline-delimited JSON logs                           |
 | `LIVE_TEST`           | No             | Set to `1` to run live integration tests                                |
 | `X402_TEST_URL`       | No             | x402 endpoint for live tests (default: `https://x402index.com/api/all`) |
 
 ### Service proxy URLs
 
-Each service has an optional `*_X402_URL` environment variable that overrides its default host. Set these to point a service at a real x402 proxy (e.g. foldset.xyz, zauthx402.com) once you have verified endpoints. Without them, the placeholder hosts remain in place and `npm run diagnose` will report `ENOTFOUND`.
+Each service has an optional `*_X402_URL` environment variable that overrides its default host. Set these to point a service at a real x402 proxy once you have verified endpoints. Without them, the placeholder hosts remain in place and `npm run diagnose` will report `ENOTFOUND`.
 
 | Variable                 | Service(s)                                                         |
 | ------------------------ | ------------------------------------------------------------------ |
 | `FIRECRAWL_X402_URL`     | Firecrawl                                                          |
 | `MINIFETCH_X402_URL`     | Minifetch                                                          |
-| `GLORIA_X402_URL`        | GloriaAI                                                           |
 | `BLACKSWAN_X402_URL`     | BlackSwan                                                          |
 | `MOLTBOOK_X402_URL`      | Moltbook                                                           |
 | `SLAMAI_X402_URL`        | SLAMai_Signals, SLAMai_WalletIntel                                 |
 | `ADEXAURA_X402_URL`      | AdExAURA_Portfolio, AdExAURA_DefiPositions                         |
 | `DAPPLOOKER_X402_URL`    | DappLooker                                                         |
-| `AIMONETWORK_X402_URL`   | AiMoNetwork_LLM, AiMoNetwork_Market                                |
 | `IMFERENCE_X402_URL`     | Imference                                                          |
 | `DAYDREAMS_X402_URL`     | DaydreamsRouter                                                    |
 | `DTELECOM_X402_URL`      | dTelecomSTT                                                        |
-| `CYBERCENTRY_X402_URL`   | Cybercentry_URL, Cybercentry_IP                                    |
 | `MERCHANTGUARD_X402_URL` | MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop |
-| `TRUSTA_X402_URL`        | TrustaAI                                                           |
 | `PINATA_X402_URL`        | PinataIPFS_Upload, PinataIPFS_Get                                  |
-| `UTILITY10_X402_URL`     | Utility10                                                          |
 
 To activate a service, add the variable to `.env` and restart:
 
