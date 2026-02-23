@@ -512,3 +512,12 @@ Each service has an optional `*_X402_URL` environment variable that overrides it
 | `PINATA_X402_URL` | PinataIPFS_Upload, PinataIPFS_Get |
 | `PAIDLINKS_X402_URL` | PaidLinks_Create, PaidLinks_Access |
 | `UTILITY10_X402_URL` | Utility10 |
+
+To activate a service, add the variable to `.env` and restart:
+
+```env
+FIRECRAWL_X402_URL=https://foldset.xyz/firecrawl
+SLAMAI_X402_URL=https://zauthx402.com/slamai
+```
+
+`npm run diagnose` will then show those services as ✅ live instead of ❌ ENOTFOUND.
