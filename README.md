@@ -486,3 +486,29 @@ X402_TEST_URL=https://your-x402-server.io/api LIVE_TEST=1 npm run test:live
 | `LOG_FORMAT` | No | Set to `json` for newline-delimited JSON logs |
 | `LIVE_TEST` | No | Set to `1` to run live integration tests |
 | `X402_TEST_URL` | No | x402 endpoint for live tests (default: `https://x402index.com/api/all`) |
+
+### Service proxy URLs
+
+Each service has an optional `*_X402_URL` environment variable that overrides its default host. Set these to point a service at a real x402 proxy (e.g. foldset.xyz, zauthx402.com) once you have verified endpoints. Without them, the placeholder hosts remain in place and `npm run diagnose` will report `ENOTFOUND`.
+
+| Variable | Service(s) |
+|---|---|
+| `FIRECRAWL_X402_URL` | Firecrawl |
+| `MINIFETCH_X402_URL` | Minifetch |
+| `GLORIA_X402_URL` | GloriaAI |
+| `BLACKSWAN_X402_URL` | BlackSwan |
+| `MOLTBOOK_X402_URL` | Moltbook |
+| `SLAMAI_X402_URL` | SLAMai_Signals, SLAMai_WalletIntel |
+| `ADEXAURA_X402_URL` | AdExAURA_Portfolio, AdExAURA_DefiPositions |
+| `DAPPLOOKER_X402_URL` | DappLooker |
+| `WALLETHOLDINGS_X402_URL` | WalletHoldings |
+| `AIMONETWORK_X402_URL` | AiMoNetwork_LLM, AiMoNetwork_Market |
+| `IMFERENCE_X402_URL` | Imference |
+| `DAYDREAMS_X402_URL` | DaydreamsRouter |
+| `DTELECOM_X402_URL` | dTelecomSTT |
+| `CYBERCENTRY_X402_URL` | Cybercentry_URL, Cybercentry_IP |
+| `MERCHANTGUARD_X402_URL` | MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop |
+| `TRUSTA_X402_URL` | TrustaAI |
+| `PINATA_X402_URL` | PinataIPFS_Upload, PinataIPFS_Get |
+| `PAIDLINKS_X402_URL` | PaidLinks_Create, PaidLinks_Access |
+| `UTILITY10_X402_URL` | Utility10 |

@@ -95,6 +95,34 @@ export class ServiceRegistry {
 }
 
 // ---------------------------------------------------------------------------
+// Proxy base URLs — set any of these in .env to point a service at a real
+// x402 proxy (e.g. foldset.xyz, zauthx402.com, kobaru.ai).
+// Falls back to the canonical placeholder host when the variable is unset.
+// ---------------------------------------------------------------------------
+
+const BASE = {
+  ADEXAURA:       process.env.ADEXAURA_X402_URL      ?? "https://api.adexaura.com",
+  AIMONETWORK:    process.env.AIMONETWORK_X402_URL   ?? "https://api.aimo.network",
+  BLACKSWAN:      process.env.BLACKSWAN_X402_URL     ?? "https://api.blackswan.ai",
+  CYBERCENTRY:    process.env.CYBERCENTRY_X402_URL   ?? "https://api.cybercentry.ai",
+  DAYDREAMS:      process.env.DAYDREAMS_X402_URL     ?? "https://api.daydreams.ai",
+  DAPPLOOKER:     process.env.DAPPLOOKER_X402_URL    ?? "https://api.dapplooker.com",
+  DTELECOM:       process.env.DTELECOM_X402_URL      ?? "https://api.dtelecom.ai",
+  FIRECRAWL:      process.env.FIRECRAWL_X402_URL     ?? "https://api.firecrawl.dev",
+  GLORIA:         process.env.GLORIA_X402_URL        ?? "https://api.gloria.news",
+  IMFERENCE:      process.env.IMFERENCE_X402_URL     ?? "https://api.imference.ai",
+  MERCHANTGUARD:  process.env.MERCHANTGUARD_X402_URL ?? "https://api.merchantguard.io",
+  MINIFETCH:      process.env.MINIFETCH_X402_URL     ?? "https://api.minifetch.io",
+  MOLTBOOK:       process.env.MOLTBOOK_X402_URL      ?? "https://api.moltbook.ai",
+  PAIDLINKS:      process.env.PAIDLINKS_X402_URL     ?? "https://api.paidlinks.io",
+  PINATA:         process.env.PINATA_X402_URL        ?? "https://api.pinata.cloud",
+  SLAMAI:         process.env.SLAMAI_X402_URL        ?? "https://api.slam.ai",
+  TRUSTA:         process.env.TRUSTA_X402_URL        ?? "https://api.trusta.ai",
+  UTILITY10:      process.env.UTILITY10_X402_URL     ?? "https://api.utility10.com",
+  WALLETHOLDINGS: process.env.WALLETHOLDINGS_X402_URL ?? "https://api.wallet-holdings.io",
+}
+
+// ---------------------------------------------------------------------------
 // Default registry — pre-populated with all authorised Ledgerling services
 //
 // Naming convention for multi-endpoint services:
@@ -109,7 +137,7 @@ export const defaultRegistry = new ServiceRegistry({
   // ── Research & Web ───────────────────────────────────────────────────────
 
   Firecrawl: {
-    url:           "https://api.firecrawl.dev/v1/scrape",
+    url:           `${BASE.FIRECRAWL}/v1/scrape`,
     estimatedCost: 0.0100,
     description:   "Web scraping & crawling",
     inputSchemaHint: {
@@ -134,7 +162,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   Minifetch: {
-    url:           "https://api.minifetch.io/v1/fetch",
+    url:           `${BASE.MINIFETCH}/v1/fetch`,
     estimatedCost: 0.0050,
     description:   "Lightweight URL fetch",
     inputSchemaHint: {
@@ -159,7 +187,7 @@ export const defaultRegistry = new ServiceRegistry({
   // ── Market & News ─────────────────────────────────────────────────────────
 
   GloriaAI: {
-    url:           "https://api.gloria.news/v1/news/query",
+    url:           `${BASE.GLORIA}/v1/news/query`,
     estimatedCost: 0.0150,
     description:   "General news query",
     inputSchemaHint: {
@@ -183,7 +211,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   BlackSwan: {
-    url:           "https://api.blackswan.ai/v1/crypto/news",
+    url:           `${BASE.BLACKSWAN}/v1/crypto/news`,
     estimatedCost: 0.0200,
     description:   "Crypto news, market sentiment & risk signals",
     inputSchemaHint: {
@@ -207,7 +235,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   Moltbook: {
-    url:           "https://api.moltbook.ai/v1/feeds",
+    url:           `${BASE.MOLTBOOK}/v1/feeds`,
     estimatedCost: 0.0100,
     description:   "Structured news feed aggregation",
     inputSchemaHint: {
@@ -232,7 +260,7 @@ export const defaultRegistry = new ServiceRegistry({
   // ── Crypto & DeFi ─────────────────────────────────────────────────────────
 
   SLAMai_Signals: {
-    url:           "https://api.slam.ai/v1/smart-money/signals",
+    url:           `${BASE.SLAMAI}/v1/smart-money/signals`,
     estimatedCost: 0.0200,
     description:   "Smart-money & institutional on-chain signals",
     inputSchemaHint: {
@@ -256,7 +284,7 @@ export const defaultRegistry = new ServiceRegistry({
 
   SLAMai_WalletIntel: {
     // Canonical endpoint: /wallet/{address}/intel — address sent in POST body
-    url:           "https://api.slam.ai/v1/wallet/intel",
+    url:           `${BASE.SLAMAI}/v1/wallet/intel`,
     estimatedCost: 0.0200,
     description:   "Deep wallet behavioural intelligence",
     inputSchemaHint: {
@@ -279,7 +307,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   AdExAURA_Portfolio: {
-    url:           "https://api.adexaura.com/v1/portfolio",
+    url:           `${BASE.ADEXAURA}/v1/portfolio`,
     estimatedCost: 0.0100,
     description:   "Crypto portfolio overview",
     inputSchemaHint: {
@@ -301,7 +329,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   AdExAURA_DefiPositions: {
-    url:           "https://api.adexaura.com/v1/defi-positions",
+    url:           `${BASE.ADEXAURA}/v1/defi-positions`,
     estimatedCost: 0.0100,
     description:   "DeFi protocol positions (lending, liquidity, staking)",
     inputSchemaHint: {
@@ -326,7 +354,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   DappLooker: {
-    url:           "https://api.dapplooker.com/v1/query",
+    url:           `${BASE.DAPPLOOKER}/v1/query`,
     estimatedCost: 0.0150,
     description:   "On-chain protocol & dApp data queries",
     inputSchemaHint: {
@@ -349,7 +377,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   WalletHoldings: {
-    url:           "https://api.wallet-holdings.io/v1/wallet/holdings",
+    url:           `${BASE.WALLETHOLDINGS}/v1/wallet/holdings`,
     estimatedCost: 0.0100,
     description:   "Wallet token holdings & balances",
     inputSchemaHint: {
@@ -375,7 +403,7 @@ export const defaultRegistry = new ServiceRegistry({
   // ── AI & Media ────────────────────────────────────────────────────────────
 
   AiMoNetwork_LLM: {
-    url:           "https://api.aimo.network/v1/llm/infer",
+    url:           `${BASE.AIMONETWORK}/v1/llm/infer`,
     estimatedCost: 0.0300,
     description:   "General LLM inference (summarise, explain, generate text)",
     inputSchemaHint: {
@@ -401,7 +429,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   AiMoNetwork_Market: {
-    url:           "https://api.aimo.network/v1/market/data",
+    url:           `${BASE.AIMONETWORK}/v1/market/data`,
     estimatedCost: 0.0200,
     description:   "AI-augmented crypto & financial market data",
     inputSchemaHint: {
@@ -427,7 +455,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   Imference: {
-    url:           "https://api.imference.ai/v1/run",
+    url:           `${BASE.IMFERENCE}/v1/run`,
     estimatedCost: 0.0500,
     description:   "AI image generation",
     inputSchemaHint: {
@@ -450,7 +478,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   DaydreamsRouter: {
-    url:           "https://api.daydreams.ai/v1/llm/query",
+    url:           `${BASE.DAYDREAMS}/v1/llm/query`,
     estimatedCost: 0.0250,
     description:   "Multi-model LLM routing & complex reasoning",
     inputSchemaHint: {
@@ -473,7 +501,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   dTelecomSTT: {
-    url:           "https://api.dtelecom.ai/v1/stt",
+    url:           `${BASE.DTELECOM}/v1/stt`,
     estimatedCost: 0.0200,
     description:   "Speech-to-text transcription",
     inputSchemaHint: {
@@ -500,7 +528,7 @@ export const defaultRegistry = new ServiceRegistry({
   // ── Security & Compliance ─────────────────────────────────────────────────
 
   Cybercentry_URL: {
-    url:           "https://api.cybercentry.ai/v1/scan/url",
+    url:           `${BASE.CYBERCENTRY}/v1/scan/url`,
     estimatedCost: 0.0300,
     description:   "URL security & vulnerability scan",
     inputSchemaHint: {
@@ -527,7 +555,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   Cybercentry_IP: {
-    url:           "https://api.cybercentry.ai/v1/scan/ip",
+    url:           `${BASE.CYBERCENTRY}/v1/scan/ip`,
     estimatedCost: 0.0300,
     description:   "IP address reputation & threat intelligence",
     inputSchemaHint: {
@@ -553,7 +581,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   MerchantGuard_Score: {
-    url:           "https://api.merchantguard.io/v1/guardscore",
+    url:           `${BASE.MERCHANTGUARD}/v1/guardscore`,
     estimatedCost: 0.0200,
     description:   "Fraud & chargeback risk score",
     inputSchemaHint: {
@@ -576,7 +604,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   MerchantGuard_Scan: {
-    url:           "https://api.merchantguard.io/v1/guardscan",
+    url:           `${BASE.MERCHANTGUARD}/v1/guardscan`,
     estimatedCost: 0.0250,
     description:   "Deep fraud detection scan",
     inputSchemaHint: {
@@ -598,7 +626,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   MerchantGuard_MysteryShop: {
-    url:           "https://api.merchantguard.io/v1/mystery-shopper",
+    url:           `${BASE.MERCHANTGUARD}/v1/mystery-shopper`,
     estimatedCost: 0.0500,
     description:   "Mystery-shopper compliance audit",
     inputSchemaHint: {
@@ -620,7 +648,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   TrustaAI: {
-    url:           "https://api.trusta.ai/v1/attest",
+    url:           `${BASE.TRUSTA}/v1/attest`,
     estimatedCost: 0.0250,
     description:   "Identity attestation & KYC verification",
     inputSchemaHint: {
@@ -646,7 +674,7 @@ export const defaultRegistry = new ServiceRegistry({
   // ── Storage & Content ─────────────────────────────────────────────────────
 
   PinataIPFS_Upload: {
-    url:           "https://api.pinata.cloud/v1/ipfs/upload",
+    url:           `${BASE.PINATA}/v1/ipfs/upload`,
     estimatedCost: 0.0100,
     description:   "IPFS file upload & pinning",
     inputSchemaHint: {
@@ -670,7 +698,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   PinataIPFS_Get: {
-    url:           "https://api.pinata.cloud/v1/ipfs/get",
+    url:           `${BASE.PINATA}/v1/ipfs/get`,
     estimatedCost: 0.0050,
     description:   "IPFS content retrieval by CID",
     inputSchemaHint: {
@@ -693,7 +721,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   PaidLinks_Create: {
-    url:           "https://api.paidlinks.io/v1/link/create",
+    url:           `${BASE.PAIDLINKS}/v1/link/create`,
     estimatedCost: 0.0100,
     description:   "Create a monetised x402 paid link",
     inputSchemaHint: {
@@ -718,7 +746,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   PaidLinks_Access: {
-    url:           "https://api.paidlinks.io/v1/link/access",
+    url:           `${BASE.PAIDLINKS}/v1/link/access`,
     estimatedCost: 0.0050,
     description:   "Access a paid link (triggers x402 payment)",
     inputSchemaHint: {
@@ -745,7 +773,7 @@ export const defaultRegistry = new ServiceRegistry({
   // ── Utility ───────────────────────────────────────────────────────────────
 
   Utility10: {
-    url:           "https://api.utility10.com/v1/task",
+    url:           `${BASE.UTILITY10}/v1/task`,
     estimatedCost: 0.0100,
     description:   "General-purpose utility task execution",
     inputSchemaHint: {
