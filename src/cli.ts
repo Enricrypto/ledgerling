@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Ledgerling CLI
+ * Ledgerling CLI — wallet-aware
  *
  * Usage:
  *   npm run cli                          # interactive prompt
@@ -14,25 +14,26 @@ import { stdin as input, stdout as output } from "node:process"
 import { buildFetchWithPayment } from "./services/fetchWithPayment.js"
 import { classifyRequest, FALLBACK_MESSAGE } from "./classifier/classifier.js"
 import { estimateExecution, executeSteps } from "./orchestrator/orchestrator.js"
+import { ethers } from "ethers"
+import type { MatchContext } from "./classifier/types.js"
 
 // ---------------------------------------------------------------------------
 // Args
 // ---------------------------------------------------------------------------
-
 const args = process.argv.slice(2)
 const dryRunFlag = args.includes("--dry-run")
-const queryArg = args.filter((a) => !a.startsWith("--")).join(" ").trim()
+const queryArg = args
+  .filter((a) => !a.startsWith("--"))
+  .join(" ")
+  .trim()
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
 const hr = "─".repeat(60)
-
 function print(msg: string) {
   process.stdout.write(msg + "\n")
 }
-
 function printSection(title: string, body: string) {
   print(`\n${hr}`)
   print(` ${title}`)
@@ -41,19 +42,65 @@ function printSection(title: string, body: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Main
+// Readline
 // ---------------------------------------------------------------------------
-
 const rl = readline.createInterface({ input, output })
 
-async function main() {
-  print("\n🔗  Ledgerling — x402 payment pipeline\n")
+// ---------------------------------------------------------------------------
+// Wallet — always show first
+// ---------------------------------------------------------------------------
+async function showWallet() {
+  if (!process.env.EVM_PRIVATE_KEY || !process.env.CHAIN_ID) {
+    print("❌ Missing EVM_PRIVATE_KEY or CHAIN_ID in .env")
+    return null
+  }
 
-  // ── 1. Get query ──────────────────────────────────────────────────────────
+  const chainId = Number(process.env.CHAIN_ID)
+  const rpcUrl = process.env.RPC_URL ?? "https://base-sepolia.public.rpc.url"
+  const provider = new ethers.JsonRpcProvider(rpcUrl, chainId)
+  const wallet = new ethers.Wallet(process.env.EVM_PRIVATE_KEY, provider)
+
+  print("\n🚀 Wallet detected:")
+  print(`💳 Address: ${wallet.address}`)
+  print(`⛽ Chain: ${chainId}`)
+
+  try {
+    const ethBalance = await provider.getBalance(wallet.address)
+    print(`⛽ ETH Balance: ${ethers.formatEther(ethBalance)} ETH`)
+  } catch (err: any) {
+    print(`⚠ Could not fetch ETH balance: ${err.message}`)
+  }
+
+  try {
+    const USDC_ADDRESS =
+      process.env.USDC_ADDRESS ?? "0xYourSepoliaUSDCAddressHere"
+    const ERC20 = new ethers.Contract(
+      USDC_ADDRESS,
+      ["function balanceOf(address) view returns (uint256)"],
+      provider
+    )
+    const usdcBalance = await ERC20.balanceOf(wallet.address)
+    print(`💰 USDC Balance: ${ethers.formatUnits(usdcBalance, 6)} USDC`)
+  } catch (err: any) {
+    print(`⚠ Could not fetch USDC balance: ${err.message}`)
+  }
+
+  return wallet
+}
+
+// ---------------------------------------------------------------------------
+// Main CLI
+// ---------------------------------------------------------------------------
+async function main() {
+  print("\n🔗 Ledgerling — x402 payment pipeline\n")
+
+  // 1️⃣ Show wallet first
+  const wallet = await showWallet()
+
+  // 2️⃣ Get query
   let query = queryArg
   if (!query) {
-    query = await rl.question("  Query: ")
-    query = query.trim()
+    query = (await rl.question("  Query: ")).trim()
   } else {
     print(`  Query: ${query}`)
   }
@@ -64,24 +111,38 @@ async function main() {
     process.exit(0)
   }
 
-  // ── 2. Classify ───────────────────────────────────────────────────────────
+  // 3️⃣ Build MatchContext with wallet prefilled
+  const ctx: MatchContext = {
+    urls: [], // will be filled later if user provides URL
+    walletAddresses: wallet ? [wallet.address] : [],
+    ipAddresses: [],
+    cryptoSymbols: [],
+    raw: query
+  }
+
+  // 4️⃣ Classify query
   const classification = classifyRequest(query)
 
   if (!classification.inScope || !classification.steps.length) {
-    printSection("Out of scope", classification.fallbackMessage ?? FALLBACK_MESSAGE)
+    printSection(
+      "Out of scope",
+      classification.fallbackMessage ?? FALLBACK_MESSAGE
+    )
     print("")
     rl.close()
     process.exit(0)
   }
 
-  // ── 3. Estimate (preflight — no charges) ──────────────────────────────────
+  // 5️⃣ Preflight estimate
   print("\n  Running preflight checks…")
   const estimation = await estimateExecution(classification.steps)
 
   printSection("Execution plan", estimation.uxSummary)
 
   if (!estimation.healthy) {
-    print(`\n  ⚠  Some services appear unreachable: ${estimation.unavailableServices.join(", ")}`)
+    print(
+      `\n  ⚠ Some services appear unreachable: ${estimation.unavailableServices.join(", ")}`
+    )
     const proceed = await rl.question("  Continue anyway? (y/N): ")
     if (proceed.trim().toLowerCase() !== "y") {
       print("  Aborted.\n")
@@ -90,39 +151,40 @@ async function main() {
     }
   }
 
-  // ── 4. Dry-run exit ───────────────────────────────────────────────────────
+  // 6️⃣ Dry-run exit
   if (dryRunFlag) {
     print("\n  --dry-run flag set. No charges were incurred.\n")
     rl.close()
     process.exit(0)
   }
 
-  // ── 5. Confirm ────────────────────────────────────────────────────────────
-  const confirm = await rl.question("\n  Proceed and authorise payment? (y/N): ")
+  // 7️⃣ Confirm payment
+  const confirm = await rl.question(
+    "\n  Proceed and authorise payment? (y/N): "
+  )
   if (confirm.trim().toLowerCase() !== "y") {
     print("  Aborted. No charges incurred.\n")
     rl.close()
     process.exit(0)
   }
 
-  // ── 6. Build signer ───────────────────────────────────────────────────────
-  print("\n  Initialising wallet…")
+  // 8️⃣ Build fetchFn with x402 payment
   let fetchFn: Awaited<ReturnType<typeof buildFetchWithPayment>>
   try {
     fetchFn = await buildFetchWithPayment()
   } catch (err: any) {
-    print(`\n  ✗  Wallet error: ${err.message}`)
+    print(`\n  ✗ Wallet error: ${err.message}`)
     print("  Check your .env (OPENFORT_SECRET_KEY or EVM_PRIVATE_KEY).\n")
     rl.close()
     process.exit(1)
   }
 
-  // ── 7. Execute ────────────────────────────────────────────────────────────
+  // 9️⃣ Execute steps
   print("  Executing steps…\n")
   const result = await executeSteps(classification.steps, fetchFn)
 
   if (result.success) {
-    printSection("✓  Done", result.uxMessage)
+    printSection("✓ Done", result.uxMessage)
     print("")
     result.results.forEach((r, i) => {
       print(`  Step ${i + 1} result:`)
@@ -130,12 +192,17 @@ async function main() {
       print("")
     })
   } else {
-    printSection("✗  Failed", result.uxMessage)
+    printSection("✗ Failed", result.uxMessage)
     print("")
   }
 
   rl.close()
 }
+
+// Graceful error handling
+process.stdout.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EPIPE") process.exit(0)
+})
 
 main().catch((err) => {
   process.stderr.write(`\nFatal: ${err.message}\n`)
