@@ -1,6 +1,6 @@
 # Ledgerling
 
-A TypeScript orchestration engine for [x402](https://www.x402.org) micropayments. Ledgerling classifies natural-language requests into paid service calls, estimates costs before charging, and executes them atomically — so users are never silently charged for partial work.
+A TypeScript orchestration engine for [x402](https://www.x402.org) micropayments. Ledgerling classifies natural-language requests into paid service calls, estimates costs before charging, and executes them atomically - so users are never silently charged for partial work.
 
 ---
 
