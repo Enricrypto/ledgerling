@@ -18,8 +18,8 @@ RUN npm install --omit=dev
 # Copy source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build || npx tsc
+# Build TypeScript (exclude tests)
+RUN npx tsc -p tsconfig.build.json
 
 # Expose port (optional, for future webhook mode)
 EXPOSE 3000

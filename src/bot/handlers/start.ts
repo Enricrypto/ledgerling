@@ -1,5 +1,5 @@
 import type { Context } from "grammy";
-import { WELCOME_MESSAGE } from "../ui/messages.js";
+import { getWelcomeMessage } from "../ui/messages.js";
 import { getBalance } from "../services/balance.js";
 import { sessions } from "../services/sessions.js";
 
@@ -19,5 +19,5 @@ export async function handleStart(ctx: Context): Promise<void> {
     });
   }
 
-  await ctx.reply(WELCOME_MESSAGE);
+  await ctx.reply(getWelcomeMessage());
 }

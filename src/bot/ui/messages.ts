@@ -5,18 +5,22 @@
  * Users must never know they're using blockchain.
  */
 
-export const WELCOME_MESSAGE = `👋 Hi! I'm AlmaBot.
+export function getWelcomeMessage(): string {
+  const hour = new Date().getUTCHours();
 
-I search the web, analyze data, and compile results using micro-paid APIs — faster and more focused than a regular search.
+  let timeOfDay: string;
+  if (hour >= 5 && hour < 12) {
+    timeOfDay = "this morning";
+  } else if (hour >= 12 && hour < 17) {
+    timeOfDay = "this afternoon";
+  } else if (hour >= 17 && hour < 21) {
+    timeOfDay = "this evening";
+  } else {
+    timeOfDay = "tonight";
+  }
 
-You have $1.00 in free credits to try.
-
-Just type what you want to know:
-• "What's happening with AI regulation in Europe?"
-• "Morning market briefing"
-• "Summarize https://example.com/article"
-
-Each query costs $0.01–$0.05 depending on complexity.`;
+  return `Hi, how can I help you ${timeOfDay}?`;
+}
 
 export const HELP_MESSAGE = `🤖 AlmaBot Help
 
