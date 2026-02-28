@@ -4,6 +4,29 @@ A TypeScript orchestration engine for [x402](https://www.x402.org) micropayments
 
 ---
 
+## 🤖 New: Telegram Bot (AlmaBot)
+
+Ledgerling now includes a **Telegram bot** that wraps the engine with a conversational UI. Users send natural language queries, watch real-time payment progress, and receive formatted results — all without seeing blockchain, wallets, or crypto.
+
+**Quick start:**
+
+```bash
+npm install
+npm run bot
+```
+
+**Testing without Telegram:**
+
+```bash
+npm run test:bot "What's happening with AI regulation?"
+```
+
+**Full setup guide:** [TELEGRAM_BOT.md](TELEGRAM_BOT.md)  
+**Docker & testing:** [DOCKER_TESTING.md](DOCKER_TESTING.md)  
+**Demo checklist:** [DEMO_CHECKLIST.md](DEMO_CHECKLIST.md)
+
+---
+
 ## How it works
 
 ```
@@ -100,7 +123,26 @@ Tests:       220 passed, 220 total
 
 ## Running locally
 
-There are three entry points. No wallet is needed for the first two.
+There are four entry points. No wallet is needed for the first two.
+
+---
+
+### `npm run bot` — Telegram bot (requires BOT_TOKEN)
+
+Starts the Telegram bot. Users interact via Telegram chat — the bot handles classification, payment orchestration, and result formatting. See [TELEGRAM_BOT.md](TELEGRAM_BOT.md) for full setup.
+
+```bash
+# Start bot (long polling)
+npm run bot
+
+# Development mode (auto-restart on changes)
+npm run bot:dev
+
+# Generate QR code for mobile access
+npm run qr
+```
+
+**Required env vars:** `BOT_TOKEN`, `OPENFORT_SECRET_KEY` (or `EVM_PRIVATE_KEY`)
 
 ---
 
@@ -323,14 +365,14 @@ The default `src/index.ts` calls a single x402 endpoint using `buildFetchWithPay
 
 ## Supported services
 
-| Capability            | Services                                                                          |
-| --------------------- | --------------------------------------------------------------------------------- |
-| Research & Web        | Firecrawl, Minifetch                                                              |
-| Market & News         | BlackSwan, Moltbook                                                               |
+| Capability            | Services                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| Research & Web        | Firecrawl, Minifetch                                                                       |
+| Market & News         | BlackSwan, Moltbook                                                                        |
 | Crypto & DeFi         | SLAMai_Signals, SLAMai_WalletIntel, AdExAURA_Portfolio, AdExAURA_DefiPositions, DappLooker |
-| AI & Media            | Imference, DaydreamsRouter, dTelecomSTT                                           |
-| Security & Compliance | MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop                |
-| Storage & Content     | PinataIPFS_Upload, PinataIPFS_Get                                                 |
+| AI & Media            | Imference, DaydreamsRouter, dTelecomSTT                                                    |
+| Security & Compliance | MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop                         |
+| Storage & Content     | PinataIPFS_Upload, PinataIPFS_Get                                                          |
 
 17 services total across 6 capability groups.
 
@@ -350,9 +392,9 @@ const result: PipelineResult = await runPipeline(
     dryRun: false, // true = estimate only, no charges
     continueOnUnhealthy: false, // true = proceed even if a service is down
     stepTimeoutMs: 30_000, // per-step timeout (0 = disabled)
-    registry // optional custom ServiceRegistry
-  }
-)
+    registry, // optional custom ServiceRegistry
+  },
+);
 ```
 
 `PipelineResult` fields:
@@ -373,9 +415,9 @@ const result: PipelineResult = await runPipeline(
 Runs preflight health checks and builds a cost estimate without charging:
 
 ```typescript
-const est = await estimateExecution(steps)
+const est = await estimateExecution(steps);
 
-console.log(est.uxSummary)
+console.log(est.uxSummary);
 // Ledgerling will execute 2 steps:
 //   1. Firecrawl — Web scraping & crawling (~$0.0100)
 //   2. BlackSwan — Crypto news, market sentiment & risk signals (~$0.0300)
@@ -383,7 +425,7 @@ console.log(est.uxSummary)
 // Estimated total: ~$0.0400 USD
 
 if (!est.healthy) {
-  console.warn("Unavailable services:", est.unavailableServices)
+  console.warn("Unavailable services:", est.unavailableServices);
 }
 ```
 
@@ -396,15 +438,15 @@ Atomic sequential execution. Halts on first failure and reports exactly what was
 ```typescript
 const result = await executeSteps(steps, fetchFn, {
   stepTimeoutMs: 15_000,
-  registry
-})
+  registry,
+});
 
 if (result.success) {
-  console.log(result.uxMessage) // "All 2 steps completed successfully."
-  console.log(result.totalCost) // actual USD from x402 receipts
+  console.log(result.uxMessage); // "All 2 steps completed successfully."
+  console.log(result.totalCost); // actual USD from x402 receipts
 } else {
-  console.error(result.uxMessage) // includes charge notice for prior steps
-  console.error(result.failedStep) // which step failed
+  console.error(result.uxMessage); // includes charge notice for prior steps
+  console.error(result.failedStep); // which step failed
 }
 ```
 
@@ -416,8 +458,8 @@ Maps a natural-language query to a list of `TaskStep` objects. Passes an optiona
 
 ```typescript
 const { inScope, steps, fallbackMessage } = classifyRequest(
-  "get the ETH price and check for fraudulent activity on 0xAbCd..."
-)
+  "get the ETH price and check for fraudulent activity on 0xAbCd...",
+);
 // steps = [
 //   { capability: "Market & News", service: "BlackSwan", query: { topic: "..." } },
 //   { capability: "Security & Compliance", service: "MerchantGuard_Score", query: { message: "..." } },
@@ -433,12 +475,12 @@ The classifier is fully registry-driven — every service carries its own `class
 ```typescript
 import {
   ServiceRegistry,
-  defaultRegistry
-} from "./src/registry/serviceRegistry.js"
-import type { MatchContext } from "./src/classifier/types.js"
+  defaultRegistry,
+} from "./src/registry/serviceRegistry.js";
+import type { MatchContext } from "./src/classifier/types.js";
 
 // Extend the default registry with a new x402 service
-const registry = defaultRegistry.clone()
+const registry = defaultRegistry.clone();
 registry.register("MyService", {
   url: "https://api.myservice.io/v1/run",
   estimatedCost: 0.05,
@@ -447,12 +489,12 @@ registry.register("MyService", {
   capability: "Utility",
   classification: {
     phrases: ["my service", "run myservice"],
-    keywords: ["myservice"]
+    keywords: ["myservice"],
   },
-  buildQuery: (raw: string, _ctx: MatchContext) => ({ query: raw })
-})
+  buildQuery: (raw: string, _ctx: MatchContext) => ({ query: raw }),
+});
 
-await runPipeline(query, fetchFn, { registry })
+await runPipeline(query, fetchFn, { registry });
 ```
 
 `ServiceConfig` fields:
