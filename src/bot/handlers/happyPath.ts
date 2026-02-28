@@ -18,17 +18,25 @@ interface HappyPathStep {
 
 const HAPPY_PATH_STEPS: HappyPathStep[] = [
   {
+    name: "Alma Orchestration",
+    emoji: "🤖",
+    description: "Orchestrating plan",
+    cost: 0.005,
+    txHash:
+      "0x1111111111111111111111111111111111111111111111111111111111111111",
+  },
+  {
     name: "Company Financials API",
     emoji: "💼",
     description: "Checking company financials",
-    cost: 0.005,
+    cost: 0.008,
     txHash: "0xabc1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
   },
   {
     name: "News Intelligence API",
     emoji: "📰",
     description: "Scanning recent news & launches",
-    cost: 0.003,
+    cost: 0.01,
     txHash:
       "0xdef4567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   },
@@ -36,14 +44,14 @@ const HAPPY_PATH_STEPS: HappyPathStep[] = [
     name: "Team & Culture Analysis API",
     emoji: "👥",
     description: "Analyzing team & culture signals",
-    cost: 0.005,
+    cost: 0.008,
     txHash: "0x4567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
   },
   {
     name: "Funding & Runway API",
     emoji: "⚖️",
     description: "Checking funding runway & stability",
-    cost: 0.003,
+    cost: 0.006,
     txHash:
       "0x7890abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456",
   },
@@ -51,7 +59,7 @@ const HAPPY_PATH_STEPS: HappyPathStep[] = [
     name: "LLM Report Composer",
     emoji: "🧠",
     description: "Composing your report",
-    cost: 0.008,
+    cost: 0.015,
     txHash:
       "0xfff9999999abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   },
@@ -159,7 +167,7 @@ export async function handleHappyPath(ctx: Context): Promise<void> {
   const balance = getBalance(userId);
   if (balance < MIN_BALANCE) {
     await ctx.reply(
-      `Need at least $${MIN_BALANCE.toFixed(2)} credits to run the demo. You have ${formatBalance(userId)}.\n\nUse /balance to check your credits.`,
+      `Need at least $${MIN_BALANCE.toFixed(3)} credits to run the demo. You have ${formatBalance(userId)}.\n\nUse /balance to check your credits.`,
     );
     return;
   }
@@ -169,12 +177,12 @@ export async function handleHappyPath(ctx: Context): Promise<void> {
 
   for (let i = 0; i < HAPPY_PATH_STEPS.length; i++) {
     const step = HAPPY_PATH_STEPS[i];
-    receiptLines.push(`${step.emoji} ${step.name} — $${step.cost.toFixed(2)}`);
+    receiptLines.push(`${step.emoji} ${step.name} — $${step.cost.toFixed(3)}`);
   }
 
   receiptLines.push("");
   receiptLines.push("━━━━━━━━━━━━━━━━━");
-  receiptLines.push(`**Total: $${TOTAL_COST.toFixed(2)}**`);
+  receiptLines.push(`**Total: $${TOTAL_COST.toFixed(3)}**`);
 
   const receiptMsg = await ctx.reply(receiptLines.join("\n"), {
     parse_mode: "Markdown",
@@ -306,13 +314,13 @@ export async function executeHappyPath(
     const stepConfig = HAPPY_PATH_STEPS[i];
     const txUrl = `${config.BASESCAN_URL}${step.txHash}`;
     receiptLines.push(
-      `${stepConfig.emoji} [${step.service}](${txUrl}) — $${step.costUsd.toFixed(2)}`,
+      `${stepConfig.emoji} [${step.service}](${txUrl}) — $${step.costUsd.toFixed(3)}`,
     );
   }
 
   receiptLines.push("");
   receiptLines.push("━━━━━━━━━━━━━━━━━");
-  receiptLines.push(`**Total: $${TOTAL_COST.toFixed(2)}**`);
+  receiptLines.push(`**Total: $${TOTAL_COST.toFixed(3)}**`);
 
   await ctx.reply(receiptLines.join("\n"), {
     parse_mode: "Markdown",
@@ -321,7 +329,7 @@ export async function executeHappyPath(
       inline_keyboard: [
         [
           {
-            text: "📋 View Report",
+            text: "📊 View",
             callback_data: `approve_report:${userId}`,
           },
         ],

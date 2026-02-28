@@ -31,16 +31,5 @@ export function formatResult(
   const escapedAnswer = escapeMarkdownV2(answer);
   const time = escapeMarkdownV2(`${elapsedSeconds}s`);
 
-  // Only show cost if actually charged
-  if (result.totalCostUsd > 0.001) {
-    const cost = escapeMarkdownV2(`$${result.totalCostUsd.toFixed(3)}`);
-    const balance = escapeMarkdownV2(formatBalance(userId));
-    return [
-      escapedAnswer,
-      "",
-      `Cost: ${cost} · Balance: ${balance} · ${time}`,
-    ].join("\n");
-  }
-
   return [escapedAnswer, "", time].join("\n");
 }

@@ -182,11 +182,17 @@ export async function runOrchestrator(
           ? Object.keys(result.result)
           : undefined,
       fullResult: step.service === "Imference" ? result.result : undefined,
+      cost: result.cost,
+      receipt: result.receipt,
     });
 
     if (result.success) {
-      // Cost is in USD (from x402 receipt.amount)
-      const costUsd = result.cost ?? 0;
+      // Cost is in micro-USDC (6 decimals) - convert to USD
+      // Fallback to estimatedCost when x402 server doesn't return settlement header
+      const costUsd =
+        result.cost !== undefined
+          ? result.cost / 1_000_000
+          : (config?.estimatedCost ?? 0);
       totalCost += costUsd;
 
       // Imference is async: initial 200 returns { request_id }, image must be polled
@@ -252,9 +258,10 @@ function composeAnswer(steps: TaskStep[], results: any[]): string {
     const query = steps[i].query;
 
     // Special handling for Imference image generation
+    // Use plain text format (Markdown links get broken by escapeMarkdownV2)
     if (service === "Imference" && r?.url) {
       const prompt = query?.prompt || query?.text || "your prompt";
-      return `[${prompt}](${r.url})`;
+      return `🎨 "${prompt}"\n\n🖼️ ${r.url}`;
     }
 
     // Most x402 services return { content, data, text, result, ... }

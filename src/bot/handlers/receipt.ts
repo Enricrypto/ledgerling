@@ -19,7 +19,7 @@ export async function handleReceiptCallback(ctx: Context): Promise<void> {
     .filter((s) => s && s.status !== "error")
     .reduce((sum, s) => sum + s.costUsd, 0);
 
-  if (totalCost < 0.001) {
+  if (totalCost === 0) {
     await ctx.reply("Don't worry, you were not charged for this.");
     return;
   }

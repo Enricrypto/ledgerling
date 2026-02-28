@@ -339,7 +339,9 @@ bot.on("message", async (ctx) => {
 
 // ── Error handling — NEVER crash ─────────────────────────────────────────────
 
-bot.catch(() => {});
+bot.catch((err) => {
+  console.error("[Bot Error]", err.error ?? err);
+});
 
 // ── Start bot ────────────────────────────────────────────────────────────────
 
