@@ -375,10 +375,28 @@ export const defaultRegistry = new ServiceRegistry({
     inputSchemaHint: { prompt: "Image description", style: "Style hint" },
     capability: "AI & Media",
     classification: {
-      phrases: ["generate image", "ai image", "create art", "draw"],
-      keywords: ["image"],
+      phrases: [
+        "generate image",
+        "generate an image",
+        "create an image",
+        "create image",
+        "make an image",
+        "make image",
+        "ai image",
+        "image of",
+        "image for",
+        "logo image",
+        "draw image",
+        "draw a"
+      ],
+      keywords: ["image", "logo", "illustration", "artwork", "render"]
     },
-    buildQuery: (raw) => ({ prompt: raw }),
+    buildQuery: (raw, ctx) => ({
+      prompt: raw,
+      model: process.env.IMFERENCE_DEFAULT_MODEL ?? "nova3dcgxl",
+      // address is injected by the CLI / bot orchestrator after signer init
+      address: ctx.walletAddresses[0] ?? undefined
+    })
   },
 
   DaydreamsRouter: {

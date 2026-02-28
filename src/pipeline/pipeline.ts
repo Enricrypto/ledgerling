@@ -7,7 +7,6 @@ import {
   type OrchestratorResult,
 } from "../orchestrator/orchestrator.js"
 import { type ServiceRegistry } from "../registry/serviceRegistry.js"
-import { logger } from "../utils/logger.js"
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -80,11 +79,9 @@ export async function runPipeline(
   } = options
 
   // ── 1. Classify ────────────────────────────────────────────────────────────
-  logger.info("Pipeline: classifying query", { query: userQuery })
   const classification = classifyRequest(userQuery)
 
   if (!classification.inScope || !classification.steps.length) {
-    logger.warn("Pipeline: query out of scope", { query: userQuery })
     return {
       query: userQuery,
       classification,
@@ -96,17 +93,11 @@ export async function runPipeline(
   }
 
   // ── 2. Estimate ────────────────────────────────────────────────────────────
-  logger.info("Pipeline: running preflight estimation", {
-    steps: classification.steps.length,
-  })
   const estimation = await estimateExecution(classification.steps, registry)
 
   // ── 3. Abort if unhealthy (unless overridden) ──────────────────────────────
   if (!continueOnUnhealthy && !estimation.healthy) {
     const services = estimation.unavailableServices.join(", ")
-    logger.warn("Pipeline: aborting — unhealthy services", {
-      unavailable: estimation.unavailableServices,
-    })
     return {
       query: userQuery,
       classification,
@@ -118,9 +109,6 @@ export async function runPipeline(
 
   // ── 4. Dry-run exit ────────────────────────────────────────────────────────
   if (dryRun) {
-    logger.info("Pipeline: dry-run complete", {
-      estimatedCost: estimation.estimatedTotalCost,
-    })
     return {
       query: userQuery,
       classification,
@@ -130,24 +118,10 @@ export async function runPipeline(
   }
 
   // ── 5. Execute ─────────────────────────────────────────────────────────────
-  logger.info("Pipeline: starting execution", {
-    steps: classification.steps.length,
-    estimatedCost: estimation.estimatedTotalCost,
-  })
-
   const execution = await executeSteps(classification.steps, fetchFn, {
     registry,
     stepTimeoutMs,
   })
-
-  if (execution.success) {
-    logger.info("Pipeline: execution complete", { totalCost: execution.totalCost })
-  } else {
-    logger.error("Pipeline: execution failed", {
-      failedStep: execution.failedStep?.service,
-      totalCost: execution.totalCost,
-    })
-  }
 
   return {
     query: userQuery,

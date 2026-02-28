@@ -30,10 +30,13 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "^1.44.1",
     "@openfort/openfort-node": "^0.8.2",
+    "@types/express": "^5.0.6",
     "@x402/axios": "^2.4.0",
     "@x402/core": "^2.4.0",
     "@x402/evm": "^2.4.0",
+    "@x402/express": "^2.5.0",
     "@x402/extensions": "^2.4.0",
     "@x402/fetch": "^2.4.0",
     "axios": "^1.13.5",
@@ -41,6 +44,7 @@
     "grammy": "^1.31.0",
     "qrcode": "^1.5.4",
     "dotenv": "^17.3.1",
+    "express": "^5.2.1",
     "viem": "^2.46.2"
   }
 }

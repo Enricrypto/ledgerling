@@ -48,6 +48,11 @@ temp/
 *.tmp
 
 # ------------------------------
+# Local wallet store (dev only — replace with real DB in production)
+# ------------------------------
+wallets.json
+
+# ------------------------------
 # IDE / Editor
 # ------------------------------
 .vscode/

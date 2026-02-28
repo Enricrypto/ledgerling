@@ -5,7 +5,10 @@
  * Usage:
  *   npm run cli                          # interactive prompt
  *   npm run cli "scrape https://example.com"
- *   npm run cli -- --dry-run "get ETH price"
+ *   npm run cli -- --dry-run "get USDC price"
+ *
+ * The payer identity is set via CLI_USER_ID in .env (defaults to "default").
+ * Each user ID maps to a dedicated Openfort backend wallet stored in wallets.json.
  */
 
 import "dotenv/config"
@@ -14,8 +17,9 @@ import { stdin as input, stdout as output } from "node:process"
 import { buildFetchWithPayment } from "./services/fetchWithPayment.js"
 import { classifyRequest, FALLBACK_MESSAGE } from "./classifier/classifier.js"
 import { estimateExecution, executeSteps } from "./orchestrator/orchestrator.js"
+import { getOrCreateUserSigner } from "./services/userSigner.js"
+import { pollImferenceResult } from "./services/imferencePoller.js"
 import { ethers } from "ethers"
-import type { MatchContext } from "./classifier/types.js"
 
 // ---------------------------------------------------------------------------
 // Args
@@ -26,6 +30,9 @@ const queryArg = args
   .filter((a) => !a.startsWith("--"))
   .join(" ")
   .trim()
+
+// The user ID that owns the paying wallet. Set CLI_USER_ID in .env.
+const CLI_USER_ID = process.env.CLI_USER_ID ?? "default"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,42 +57,47 @@ const rl = readline.createInterface({ input, output })
 // Wallet — always show first
 // ---------------------------------------------------------------------------
 async function showWallet() {
-  if (!process.env.EVM_PRIVATE_KEY || !process.env.CHAIN_ID) {
-    print("❌ Missing EVM_PRIVATE_KEY or CHAIN_ID in .env")
+  if (!process.env.OPENFORT_SECRET_KEY || !process.env.CHAIN_ID) {
+    print("❌ Missing OPENFORT_SECRET_KEY or CHAIN_ID in .env")
     return null
   }
 
-  const chainId = Number(process.env.CHAIN_ID)
-  const rpcUrl = process.env.RPC_URL ?? "https://base-sepolia.public.rpc.url"
-  const provider = new ethers.JsonRpcProvider(rpcUrl, chainId)
-  const wallet = new ethers.Wallet(process.env.EVM_PRIVATE_KEY, provider)
-
-  print("\n🚀 Wallet detected:")
-  print(`💳 Address: ${wallet.address}`)
-  print(`⛽ Chain: ${chainId}`)
-
+  let signer: Awaited<ReturnType<typeof getOrCreateUserSigner>>
   try {
-    const ethBalance = await provider.getBalance(wallet.address)
-    print(`⛽ ETH Balance: ${ethers.formatEther(ethBalance)} ETH`)
+    signer = await getOrCreateUserSigner(CLI_USER_ID)
   } catch (err: any) {
-    print(`⚠ Could not fetch ETH balance: ${err.message}`)
+    print(`❌ Could not load wallet for user "${CLI_USER_ID}": ${err.message}`)
+    return null
   }
 
+  const { address } = signer
+  const chainId = Number(process.env.CHAIN_ID)
+  const rpcUrl = process.env.RPC_URL ?? "https://mainnet.base.org"
+  const provider = new ethers.JsonRpcProvider(rpcUrl, chainId)
+
+  print("\n🚀 Openfort wallet detected:")
+  print(`👤 User:    ${CLI_USER_ID}`)
+  print(`💳 Address: ${address}`)
+  print(`⛓ Chain:   ${chainId}`)
+
   try {
-    const USDC_ADDRESS =
-      process.env.USDC_ADDRESS ?? "0xYourSepoliaUSDCAddressHere"
-    const ERC20 = new ethers.Contract(
-      USDC_ADDRESS,
-      ["function balanceOf(address) view returns (uint256)"],
-      provider
-    )
-    const usdcBalance = await ERC20.balanceOf(wallet.address)
-    print(`💰 USDC Balance: ${ethers.formatUnits(usdcBalance, 6)} USDC`)
+    const USDC_ADDRESS = process.env.USDC_ADDRESS ?? process.env.X402_ASSET_ADDRESS ?? ""
+    if (!USDC_ADDRESS) {
+      print(`⚠ Set USDC_ADDRESS or X402_ASSET_ADDRESS to show USDC balance`)
+    } else {
+      const ERC20 = new ethers.Contract(
+        USDC_ADDRESS,
+        ["function balanceOf(address) view returns (uint256)"],
+        provider
+      )
+      const usdcBalance = await ERC20.balanceOf(address)
+      print(`💰 USDC Balance: ${ethers.formatUnits(usdcBalance, 6)} USDC`)
+    }
   } catch (err: any) {
     print(`⚠ Could not fetch USDC balance: ${err.message}`)
   }
 
-  return wallet
+  return { address, signer }
 }
 
 // ---------------------------------------------------------------------------
@@ -111,17 +123,17 @@ async function main() {
     process.exit(0)
   }
 
-  // 3️⃣ Build MatchContext with wallet prefilled
-  const ctx: MatchContext = {
-    urls: [], // will be filled later if user provides URL
-    walletAddresses: wallet ? [wallet.address] : [],
-    ipAddresses: [],
-    cryptoSymbols: [],
-    raw: query
-  }
-
-  // 4️⃣ Classify query
+  // 3️⃣ Classify query
   const classification = classifyRequest(query)
+
+  // Inject wallet address into service steps that require the payer's address (e.g. Imference)
+  if (wallet) {
+    for (const step of classification.steps) {
+      if (step.service === "Imference" && !step.query.address) {
+        step.query.address = wallet.address
+      }
+    }
+  }
 
   if (!classification.inScope || !classification.steps.length) {
     printSection(
@@ -168,13 +180,19 @@ async function main() {
     process.exit(0)
   }
 
-  // 8️⃣ Build fetchFn with x402 payment
+  // 8️⃣ Build fetchFn with x402 payment using the user's wallet
+  if (!wallet) {
+    print("\n  ✗ No wallet available. Cannot proceed.\n")
+    rl.close()
+    process.exit(1)
+  }
+
   let fetchFn: Awaited<ReturnType<typeof buildFetchWithPayment>>
   try {
-    fetchFn = await buildFetchWithPayment()
+    fetchFn = await buildFetchWithPayment(wallet.signer)
   } catch (err: any) {
     print(`\n  ✗ Wallet error: ${err.message}`)
-    print("  Check your .env (OPENFORT_SECRET_KEY or EVM_PRIVATE_KEY).\n")
+    print("  Check your .env (OPENFORT_SECRET_KEY).\n")
     rl.close()
     process.exit(1)
   }
@@ -184,11 +202,27 @@ async function main() {
   const result = await executeSteps(classification.steps, fetchFn)
 
   if (result.success) {
+    // Poll for async results (e.g. Imference returns { request_id } and image is ready later)
+    for (let i = 0; i < result.results.length; i++) {
+      const r = result.results[i]
+      if (r?.request_id && classification.steps[i]?.service === "Imference") {
+        print(`  ⏳ Image generating… (request_id: ${r.request_id})`)
+        const imageUrl = await pollImferenceResult(r.request_id)
+        if (imageUrl) {
+          result.results[i] = { ...r, url: imageUrl }
+          print(`  ✓ Image ready: ${imageUrl}`)
+        } else {
+          print(`  ⚠ Image generation timed out — check back with request_id: ${r.request_id}`)
+        }
+      }
+    }
+
     printSection("✓ Done", result.uxMessage)
     print("")
     result.results.forEach((r, i) => {
       print(`  Step ${i + 1} result:`)
-      print("  " + JSON.stringify(r, null, 2).replace(/\n/g, "\n  "))
+      const body = r !== undefined ? JSON.stringify(r, null, 2) : "(binary or empty response)"
+      print("  " + body.replace(/\n/g, "\n  "))
       print("")
     })
   } else {

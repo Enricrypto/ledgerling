@@ -3,8 +3,10 @@ import { registerExactEvmScheme } from "@x402/evm/exact/client"
 import type { ClientEvmSigner } from "@x402/evm"
 import { createPublicClient, http } from "viem"
 import { base, baseSepolia } from "viem/chains"
-import { privateKeyToAccount } from "viem/accounts"
-import { createOpenfortSigner, type EvmSignerLike } from "./openfortSigner.js"
+import { writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import type { EvmSignerLike } from "./openfortSigner.js"
 
 export interface FetchResult {
   success: boolean
@@ -15,20 +17,19 @@ export interface FetchResult {
 }
 
 /**
- * Builds a ready-to-use fetchWithPayment function.
+ * Builds a ready-to-use fetchWithPayment function for a specific user signer.
  *
- * Mode is selected automatically based on which env var is present:
- *   OPENFORT_SECRET_KEY  →  OpenFort TEE backend wallet (demo + production path)
- *   EVM_PRIVATE_KEY      →  Raw private key via viem (quick local testing only)
+ * The caller is responsible for supplying a signer — typically obtained via
+ * getOrCreateUserSigner(userId) from services/userSigner.ts.
+ *
+ * The system wallet (PAY_TO_ADDRESS) is the payment *recipient*, not the payer.
+ * Never pass the system signer here.
  *
  * Chain is selected via CHAIN_ID (default: 84532 = Base Sepolia testnet).
  * Override the RPC endpoint with RPC_URL if needed.
- *
- * Call once at server startup and reuse the returned function for all requests.
  */
-export async function buildFetchWithPayment() {
-  const signerLike = await resolveSigner()
-  const clientSigner = buildClientSigner(signerLike)
+export async function buildFetchWithPayment(signer: EvmSignerLike) {
+  const clientSigner = buildClientSigner(signer)
 
   const x402 = new x402Client()
   registerExactEvmScheme(x402, { signer: clientSigner })
@@ -42,18 +43,33 @@ export async function buildFetchWithPayment() {
     try {
       const response = await wrappedFetch(url, options)
 
-      const resultBody = await response.json().catch(() => undefined)
+      const contentType = response.headers.get("content-type") ?? ""
+      const rawText = await response.text().catch(() => "")
+      let resultBody: any
+      if (contentType.startsWith("image/")) {
+        const ext = contentType.includes("png") ? "png" : contentType.includes("gif") ? "gif" : "jpg"
+        const filePath = join(tmpdir(), `ledgerling-${Date.now()}.${ext}`)
+        const buffer = Buffer.from(rawText, "binary")
+        writeFileSync(filePath, buffer)
+        resultBody = { _type: "image", filePath, bytes: buffer.length }
+      } else {
+        try { resultBody = JSON.parse(rawText) } catch { resultBody = rawText || undefined }
+      }
 
       let cost: number | undefined
       let receipt: any | undefined
 
       if (response.ok) {
         const httpClient = new x402HTTPClient(x402)
-        receipt = httpClient.getPaymentSettleResponse((name) =>
-          response.headers.get(name)
-        )
-        if (receipt?.amount) {
-          cost = Number(receipt.amount)
+        try {
+          receipt = httpClient.getPaymentSettleResponse((name) =>
+            response.headers.get(name)
+          )
+          if (receipt?.amount) {
+            cost = Number(receipt.amount)
+          }
+        } catch {
+          // Some x402v1 servers don't return a settlement header — payment still succeeded.
         }
       }
 
@@ -67,25 +83,6 @@ export async function buildFetchWithPayment() {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-async function resolveSigner(): Promise<EvmSignerLike> {
-  if (process.env.OPENFORT_SECRET_KEY) {
-    return createOpenfortSigner()
-  }
-
-  if (process.env.EVM_PRIVATE_KEY) {
-    const account = privateKeyToAccount(process.env.EVM_PRIVATE_KEY as `0x${string}`)
-    return {
-      address: account.address,
-      signTypedData: (args) => account.signTypedData(args as any),
-    }
-  }
-
-  throw new Error(
-    "No signer configured. Set OPENFORT_SECRET_KEY (recommended) " +
-    "or EVM_PRIVATE_KEY in your .env file."
-  )
-}
 
 /**
  * Composes a ClientEvmSigner from a minimal signer + a viem public client.

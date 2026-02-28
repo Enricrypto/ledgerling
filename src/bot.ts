@@ -170,22 +170,8 @@ bot.on("message", async (ctx) => {
 
 // ── Error handling — NEVER crash ─────────────────────────────────────────────
 
-bot.catch((err) => {
-  const ctx = err.ctx;
-  console.error(`Error handling update ${ctx.update.update_id}:`);
-  const e = err.error;
-
-  if (e instanceof GrammyError) {
-    console.error("Grammy error:", e.description);
-  } else if (e instanceof HttpError) {
-    console.error("HTTP error:", e);
-  } else {
-    console.error("Unknown error:", e);
-  }
-});
+bot.catch(() => {});
 
 // ── Start bot ────────────────────────────────────────────────────────────────
 
 bot.start();
-console.log("🤖 AlmaBot is running");
-console.log(`📱 Telegram: t.me/${config.BOT_USERNAME}`);
