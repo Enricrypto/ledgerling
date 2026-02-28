@@ -10,6 +10,7 @@ import { classifyRequest } from "../../classifier/classifier.js";
 import { defaultRegistry } from "../../registry/serviceRegistry.js";
 import { buildFetchWithPayment } from "../../services/fetchWithPayment.js";
 import { logger } from "../../utils/logger.js";
+import { classifyError, uxMessageForError } from "../../utils/errorHandling.js";
 import type { TaskStep } from "../../classifier/classifier.js";
 import type { FetchResult } from "../../services/fetchWithPayment.js";
 import type {
@@ -150,12 +151,13 @@ export async function runOrchestrator(
     onStep({ ...update });
 
     if (update.status === "error") {
+      const errorKind = classifyError(update.error);
       return {
         success: false,
         answer: "",
         totalCostUsd: totalCost,
         steps: stepUpdates,
-        error: `${step.service} failed: ${update.error}`,
+        error: uxMessageForError(errorKind, step.service),
       };
     }
   }
