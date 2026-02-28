@@ -5,30 +5,30 @@
  * Swap this out for a real DB (Postgres, SQLite, etc.) when you go to production.
  */
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs"
-import { join } from "node:path"
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 
-const DB_PATH = join(process.cwd(), "wallets.json")
+const DB_PATH = join(process.cwd(), "wallets.json");
 
 interface WalletRecord {
-  address: string
-  createdAt: number
+  address: string;
+  createdAt: number;
 }
 
-type Store = Record<string, WalletRecord>
+type Store = Record<string, WalletRecord>;
 
 function load(): Store {
-  if (!existsSync(DB_PATH)) return {}
-  return JSON.parse(readFileSync(DB_PATH, "utf-8")) as Store
+  if (!existsSync(DB_PATH)) return {};
+  return JSON.parse(readFileSync(DB_PATH, "utf-8")) as Store;
 }
 
 function persist(store: Store): void {
-  writeFileSync(DB_PATH, JSON.stringify(store, null, 2))
+  writeFileSync(DB_PATH, JSON.stringify(store, null, 2));
 }
 
 /** Returns the stored wallet record for a user, or undefined if none exists. */
 export function findWallet(userId: string): WalletRecord | undefined {
-  return load()[userId]
+  return load()[userId];
 }
 
 /**
@@ -36,15 +36,31 @@ export function findWallet(userId: string): WalletRecord | undefined {
  * Idempotent — does nothing if the user already has a wallet stored.
  */
 export function saveWallet(userId: string, address: string): void {
-  const store = load()
+  const store = load();
   if (!store[userId]) {
-    store[userId] = { address, createdAt: Date.now() }
-    persist(store)
+    store[userId] = { address, createdAt: Date.now() };
+    persist(store);
   }
 }
 
 /** Returns all stored user → wallet entries. */
-export function listWallets(): Array<{ userId: string; address: string; createdAt: number }> {
-  const store = load()
-  return Object.entries(store).map(([userId, rec]) => ({ userId, ...rec }))
+export function listWallets(): Array<{
+  userId: string;
+  address: string;
+  createdAt: number;
+}> {
+  const store = load();
+  return Object.entries(store).map(([userId, rec]) => ({ userId, ...rec }));
+}
+
+/** Finds the user ID that owns a given address, or undefined if not found. */
+export function findUserByAddress(address: string): string | undefined {
+  const store = load();
+  const normalized = address.toLowerCase();
+  for (const [userId, rec] of Object.entries(store)) {
+    if (rec.address.toLowerCase() === normalized) {
+      return userId;
+    }
+  }
+  return undefined;
 }

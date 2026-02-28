@@ -78,7 +78,7 @@ const BASE = {
   DTELECOM: process.env.DTELECOM_X402_URL ?? "https://x402stt.dtelecom.org",
   FIRECRAWL: process.env.FIRECRAWL_X402_URL ?? "https://api.firecrawl.dev",
   GLORIA: process.env.GLORIA_X402_URL ?? "https://api.ledgerling.io/gloriaai",
-  IMFERENCE: process.env.IMFERENCE_X402_URL ?? "https://imference.com",
+  IMFERENCE: process.env.IMFERENCE_X402_URL ?? "https://imference.com/ondemand",
   MERCHANTGUARD:
     process.env.MERCHANTGUARD_X402_URL ??
     "https://merchantguard.ai/api/v2/sentinela",
@@ -369,7 +369,7 @@ export const defaultRegistry = new ServiceRegistry({
   },
 
   Imference: {
-    url: `${BASE.IMFERENCE}/generate`, // ✅ Fixed: /generate not /ondemand/generate
+    url: `${BASE.IMFERENCE}/generate`, // BASE.IMFERENCE includes /ondemand
     estimatedCost: 0.05,
     description: "AI image generation",
     inputSchemaHint: { prompt: "Image description", style: "Style hint" },
@@ -387,16 +387,16 @@ export const defaultRegistry = new ServiceRegistry({
         "image for",
         "logo image",
         "draw image",
-        "draw a"
+        "draw a",
       ],
-      keywords: ["image", "logo", "illustration", "artwork", "render"]
+      keywords: ["image", "logo", "illustration", "artwork", "render"],
     },
     buildQuery: (raw, ctx) => ({
       prompt: raw,
       model: process.env.IMFERENCE_DEFAULT_MODEL ?? "nova3dcgxl",
       // address is injected by the CLI / bot orchestrator after signer init
-      address: ctx.walletAddresses[0] ?? undefined
-    })
+      address: ctx.walletAddresses[0] ?? undefined,
+    }),
   },
 
   DaydreamsRouter: {

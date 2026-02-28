@@ -11,10 +11,17 @@
 
 export const CapabilityRegistry = {
   // Fetching and extracting content from the open web.
-  "Research & Web": ["Firecrawl", "Minifetch"],
+  "Research & Web": [
+    "Firecrawl",
+    "Minifetch",
+  ],
 
   // News retrieval, market feeds, and structured news aggregation.
-  "Market & News": ["GloriaAI", "BlackSwan", "Moltbook"],
+  "Market & News": [
+    "GloriaAI",
+    "BlackSwan",
+    "Moltbook",
+  ],
 
   // On-chain analytics, wallet intelligence, DeFi positions, smart-money signals.
   "Crypto & DeFi": [
@@ -54,10 +61,10 @@ export const CapabilityRegistry = {
   ],
 
   // General-purpose automation tasks.
-  // "Utility": [
-  //   "Utility10",
-  // ],
-} as const;
+  "Utility": [
+    "Utility10",
+  ],
+} as const
 
-export type Capability = keyof typeof CapabilityRegistry;
-export type Service = (typeof CapabilityRegistry)[Capability][number];
+export type Capability = keyof typeof CapabilityRegistry
+export type Service = typeof CapabilityRegistry[Capability][number]

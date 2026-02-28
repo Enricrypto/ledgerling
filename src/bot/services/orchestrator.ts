@@ -9,9 +9,13 @@
 import { classifyRequest } from "../../classifier/classifier.js";
 import { defaultRegistry } from "../../registry/serviceRegistry.js";
 import { buildFetchWithPayment } from "../../services/fetchWithPayment.js";
-import { getOrCreateUserSigner } from "../../services/userSigner.js";
+import {
+  getOrCreateUserSigner,
+  getSignerByAddress,
+} from "../../services/userSigner.js";
 import { pollImferenceResult } from "../../services/imferencePoller.js";
 import { classifyError, uxMessageForError } from "../../utils/errorHandling.js";
+import { logger } from "../../utils/logger.js";
 import type { TaskStep } from "../../classifier/classifier.js";
 import type { FetchResult } from "../../services/fetchWithPayment.js";
 import type {
@@ -21,8 +25,7 @@ import type {
 } from "../types.js";
 
 // Bot pays for all x402 requests using a dedicated bot wallet.
-// BOT_USER_ID in .env controls which Openfort wallet is used (defaults to "alma-bot").
-const BOT_USER_ID = process.env.BOT_USER_ID ?? "alma-bot";
+// Priority: FIXED_ADDRESS (direct Openfort lookup) > BOT_USER_ID > "alma-bot"
 
 // Build fetch once at module load
 let fetchFn: Awaited<ReturnType<typeof buildFetchWithPayment>> | null = null;
@@ -30,9 +33,23 @@ let signerAddress: string | null = null;
 
 async function getFetchFn() {
   if (!fetchFn) {
-    const signer = await getOrCreateUserSigner(BOT_USER_ID);
+    const fixedAddr = process.env.FIXED_ADDRESS;
+    let signer;
+
+    if (fixedAddr) {
+      // Use FIXED_ADDRESS directly from Openfort
+      logger.info("Using FIXED_ADDRESS wallet", { address: fixedAddr });
+      signer = await getSignerByAddress(fixedAddr);
+    } else {
+      // Fallback to BOT_USER_ID
+      const userId = process.env.BOT_USER_ID ?? "alma-bot";
+      logger.info("Using BOT_USER_ID wallet", { userId });
+      signer = await getOrCreateUserSigner(userId);
+    }
+
     signerAddress = signer.address;
     fetchFn = await buildFetchWithPayment(signer);
+    logger.info("Bot wallet initialized", { address: signerAddress });
   }
   return fetchFn;
 }
@@ -65,6 +82,20 @@ export async function runOrchestrator(
       if (step.service === "Imference" && !step.query.address) {
         step.query.address = signerAddress;
       }
+    }
+  }
+
+  // Log Imference payload for debugging
+  for (const step of steps) {
+    if (step.service === "Imference") {
+      logger.info("Imference step query", {
+        service: step.service,
+        url: defaultRegistry.get("Imference")?.url,
+        hasAddress: !!step.query.address,
+        address: step.query.address as string | undefined,
+        model: step.query.model as string | undefined,
+        promptLength: (step.query.prompt as string)?.length ?? 0,
+      });
     }
   }
 
@@ -103,6 +134,14 @@ export async function runOrchestrator(
     };
     onStep(update);
 
+    // Log outgoing request
+    logger.info(`[x402] Sending request to ${step.service}`, {
+      url,
+      method: "POST",
+      payloadKeys: Object.keys(step.query),
+      payload: step.service === "Imference" ? step.query : undefined,
+    });
+
     // Execute with timeout (replicate orchestrator.ts pattern)
     const fetchPromise = fetch402(url, {
       method: "POST",
@@ -132,6 +171,19 @@ export async function runOrchestrator(
       if (stepTimerId !== undefined) clearTimeout(stepTimerId);
     }
 
+    // Log response
+    logger.info(`[x402] Response from ${step.service}`, {
+      success: result.success,
+      hasResult: !!result.result,
+      error: result.error,
+      resultType: typeof result.result,
+      resultKeys:
+        result.result && typeof result.result === "object"
+          ? Object.keys(result.result)
+          : undefined,
+      fullResult: step.service === "Imference" ? result.result : undefined,
+    });
+
     if (result.success) {
       // Cost is in USD (from x402 receipt.amount)
       const costUsd = result.cost ?? 0;
@@ -141,9 +193,7 @@ export async function runOrchestrator(
       let stepResult = result.result;
       if (step.service === "Imference" && stepResult?.request_id) {
         const imageUrl = await pollImferenceResult(stepResult.request_id);
-        stepResult = imageUrl
-          ? { ...stepResult, url: imageUrl }
-          : stepResult; // keep request_id so user can check manually
+        stepResult = imageUrl ? { ...stepResult, url: imageUrl } : stepResult; // keep request_id so user can check manually
       }
 
       results.push(stepResult);
@@ -158,7 +208,6 @@ export async function runOrchestrator(
           result.receipt.transaction?.hash ??
           result.receipt.txHash ??
           result.receipt.tx;
-
       }
     } else {
       update.status = "error";

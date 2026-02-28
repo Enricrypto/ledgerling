@@ -16,50 +16,52 @@
  *   const fetchFn = await buildFetchWithPayment(signer)
  */
 
-import Openfort from "@openfort/openfort-node"
-import type { EvmSignerLike } from "./openfortSigner.js"
-import { findWallet, saveWallet } from "../server/db.js"
+import Openfort from "@openfort/openfort-node";
+import type { EvmSignerLike } from "./openfortSigner.js";
+import { findWallet, saveWallet } from "../server/db.js";
 
 function openfortClient(): Openfort {
   if (!process.env.OPENFORT_SECRET_KEY) {
-    throw new Error("Missing env var: OPENFORT_SECRET_KEY")
+    throw new Error("Missing env var: OPENFORT_SECRET_KEY");
   }
-  return new Openfort(process.env.OPENFORT_SECRET_KEY)
+  return new Openfort(process.env.OPENFORT_SECRET_KEY);
 }
 
 /**
  * Returns an EvmSignerLike for the given user, creating an Openfort backend
  * wallet if one does not already exist.
  */
-export async function getOrCreateUserSigner(userId: string): Promise<EvmSignerLike> {
-  const openfort = openfortClient()
-  const existing = findWallet(userId)
+export async function getOrCreateUserSigner(
+  userId: string,
+): Promise<EvmSignerLike> {
+  const openfort = openfortClient();
+  const existing = findWallet(userId);
 
   if (!existing) {
     // First time — create a fresh backend wallet for this user.
     const wallet = await openfort.accounts.evm.backend.create({
       idempotencyKey: `ledgerling-user-${userId}`,
-    })
-    saveWallet(userId, wallet.address)
+    });
+    saveWallet(userId, wallet.address);
     return {
       address: wallet.address as `0x${string}`,
       signTypedData: (args) => wallet.signTypedData(args as any),
-    }
+    };
   }
 
   // Wallet exists — retrieve it from Openfort and return a signer.
-  const { accounts } = await openfort.accounts.evm.backend.list()
-  const wallet = accounts.find((a) => a.address === existing.address)
+  const { accounts } = await openfort.accounts.evm.backend.list();
+  const wallet = accounts.find((a) => a.address === existing.address);
   if (!wallet) {
     throw new Error(
       `Wallet ${existing.address} (user: ${userId}) not found in Openfort. ` +
-        `Has the wallet been deleted from the dashboard?`
-    )
+        `Has the wallet been deleted from the dashboard?`,
+    );
   }
   return {
     address: wallet.address as `0x${string}`,
     signTypedData: (args) => wallet.signTypedData(args as any),
-  }
+  };
 }
 
 /**
@@ -67,5 +69,28 @@ export async function getOrCreateUserSigner(userId: string): Promise<EvmSignerLi
  * API calls. Returns undefined if the user has no wallet yet.
  */
 export function getUserWalletAddress(userId: string): string | undefined {
-  return findWallet(userId)?.address
+  return findWallet(userId)?.address;
+}
+
+/**
+ * Returns an EvmSignerLike for a specific address by looking it up in Openfort.
+ * Throws if the address is not found in any Openfort backend wallet.
+ */
+export async function getSignerByAddress(
+  address: string,
+): Promise<EvmSignerLike> {
+  const openfort = openfortClient();
+  const { accounts } = await openfort.accounts.evm.backend.list();
+  const normalized = address.toLowerCase();
+  const wallet = accounts.find((a) => a.address.toLowerCase() === normalized);
+  if (!wallet) {
+    throw new Error(
+      `Wallet ${address} not found in Openfort backend wallets. ` +
+        `Check the address exists in your Openfort dashboard.`,
+    );
+  }
+  return {
+    address: wallet.address as `0x${string}`,
+    signTypedData: (args) => wallet.signTypedData(args as any),
+  };
 }
