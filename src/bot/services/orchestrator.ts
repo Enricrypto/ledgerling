@@ -249,6 +249,13 @@ function composeAnswer(steps: TaskStep[], results: any[]): string {
 
   const parts = results.map((r, i) => {
     const service = steps[i].service;
+    const query = steps[i].query;
+
+    // Special handling for Imference image generation
+    if (service === "Imference" && r?.url) {
+      const prompt = query?.prompt || query?.text || "your prompt";
+      return `[${prompt}](${r.url})`;
+    }
 
     // Most x402 services return { content, data, text, result, ... }
     // Extract the most readable field

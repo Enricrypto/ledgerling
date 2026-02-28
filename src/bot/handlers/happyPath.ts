@@ -164,17 +164,65 @@ export async function handleHappyPath(ctx: Context): Promise<void> {
     return;
   }
 
-  // Phase 1: Planning
-  await ctx.replyWithChatAction("typing");
-  const planningMsg = await ctx.reply("🧠 Planning your research...");
-  await new Promise((r) => setTimeout(r, 800));
+  // Show receipt upfront with confirmation
+  const receiptLines = ["🧾 **Confirm Purchase**", ""];
 
+  for (let i = 0; i < HAPPY_PATH_STEPS.length; i++) {
+    const step = HAPPY_PATH_STEPS[i];
+    receiptLines.push(`${step.emoji} ${step.name} — $${step.cost.toFixed(2)}`);
+  }
+
+  receiptLines.push("");
+  receiptLines.push("━━━━━━━━━━━━━━━━━");
+  receiptLines.push(`**Total: $${TOTAL_COST.toFixed(2)}**`);
+
+  const receiptMsg = await ctx.reply(receiptLines.join("\n"), {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Accept", callback_data: `confirm_happy:${userId}` },
+          { text: "❌ Decline", callback_data: `cancel_happy:${userId}` },
+        ],
+      ],
+    },
+  });
+
+  // Store pending state
+  const session = sessions.get(userId) ?? { userId, queryCount: 0 };
+  session.pendingHappyPath = {
+    messageId: receiptMsg.message_id,
+    chatId: receiptMsg.chat.id,
+    timestamp: Date.now(),
+  };
+  sessions.set(userId, session);
+}
+
+// ============================================================================
+// Execution Handler (called from callback)
+// ============================================================================
+
+export async function executeHappyPath(
+  ctx: Context,
+  userId: string,
+): Promise<void> {
+  const session = sessions.get(userId);
+  if (!session?.pendingHappyPath) {
+    await ctx.answerCallbackQuery({ text: "Session expired" });
+    return;
+  }
+
+  const { chatId, messageId } = session.pendingHappyPath;
+
+  // Clear pending state
+  session.pendingHappyPath = undefined;
+  sessions.set(userId, session);
+
+  await ctx.answerCallbackQuery({ text: "Processing..." });
+
+  // Update message to show execution started
   try {
-    await ctx.api.editMessageText(
-      planningMsg.chat.id,
-      planningMsg.message_id,
-      "📝 Planning your research... ✔️",
-    );
+    await ctx.api.editMessageText(chatId, messageId, "⏳ Executing...");
   } catch {
     /* ignore */
   }
@@ -184,11 +232,15 @@ export async function handleHappyPath(ctx: Context): Promise<void> {
     status: "pending",
   }));
 
-  const progressMsg = await ctx.reply(
-    buildProgressMessage(HAPPY_PATH_STEPS, states),
-  );
-  const chatId = progressMsg.chat.id;
-  const msgId = progressMsg.message_id;
+  try {
+    await ctx.api.editMessageText(
+      chatId,
+      messageId,
+      buildProgressMessage(HAPPY_PATH_STEPS, states),
+    );
+  } catch {
+    /* ignore */
+  }
 
   let lastEditTime = 0;
   const updateProgress = async (showComplete: boolean = false) => {
@@ -198,7 +250,7 @@ export async function handleHappyPath(ctx: Context): Promise<void> {
     try {
       await ctx.api.editMessageText(
         chatId,
-        msgId,
+        messageId,
         buildProgressMessage(HAPPY_PATH_STEPS, states, showComplete),
       );
     } catch {
@@ -239,32 +291,28 @@ export async function handleHappyPath(ctx: Context): Promise<void> {
   deduct(userId, TOTAL_COST);
 
   // Build the final report
-  const reportMessage = `${OPENFORT_REPORT}
-
-💰 Cost: $${TOTAL_COST.toFixed(3)} · Balance: ${formatBalance(userId)}`;
+  const reportMessage = `${OPENFORT_REPORT}`;
 
   // Store session for receipt + pending report
-  const session = sessions.get(userId) ?? { userId, queryCount: 0 };
   session.lastSteps = stepUpdates;
-  session.pendingReport = reportMessage; // Store report for approval callback
+  session.pendingReport = reportMessage;
   sessions.set(userId, session);
 
-  // Phase 5: Show receipt with approval button (payment confirmation)
-  const receiptLines = ["🧾 Receipt — Openfort Pre-Offer Report", ""];
+  // Phase 5: Show receipt with approval button
+  const receiptLines = ["🧾 **Receipt**", ""];
 
   for (let i = 0; i < stepUpdates.length; i++) {
     const step = stepUpdates[i];
     const stepConfig = HAPPY_PATH_STEPS[i];
     const txUrl = `${config.BASESCAN_URL}${step.txHash}`;
     receiptLines.push(
-      `${stepConfig.emoji} [${step.service}](${txUrl}) — $${step.costUsd.toFixed(3)}`,
+      `${stepConfig.emoji} [${step.service}](${txUrl}) — $${step.costUsd.toFixed(2)}`,
     );
   }
 
   receiptLines.push("");
-  receiptLines.push(`Total: $${TOTAL_COST.toFixed(3)}`);
   receiptLines.push("━━━━━━━━━━━━━━━━━");
-  receiptLines.push("Settled on Base L2 via x402 protocol");
+  receiptLines.push(`**Total: $${TOTAL_COST.toFixed(2)}**`);
 
   await ctx.reply(receiptLines.join("\n"), {
     parse_mode: "Markdown",
@@ -273,7 +321,7 @@ export async function handleHappyPath(ctx: Context): Promise<void> {
       inline_keyboard: [
         [
           {
-            text: "✅ Accept",
+            text: "📋 View Report",
             callback_data: `approve_report:${userId}`,
           },
         ],

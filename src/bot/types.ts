@@ -42,4 +42,18 @@ export interface UserSession {
   lastSteps?: StepUpdate[];
   pendingReport?: string;
   queryCount: number;
+  pendingPlan?: {
+    query: string;
+    steps: any[];
+    classification: any;
+    estimatedCost: number;
+    messageId: number;
+    chatId: number;
+    timestamp: number;
+  };
+  pendingHappyPath?: {
+    messageId: number;
+    chatId: number;
+    timestamp: number;
+  };
 }

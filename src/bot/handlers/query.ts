@@ -19,6 +19,8 @@ import { sessions } from "../services/sessions.js";
 import { pendingPrompts } from "../services/prompts.js";
 import { config } from "../config.js";
 import { classifyRequest } from "../../classifier/classifier.js";
+import { estimateExecution } from "../../orchestrator/orchestrator.js";
+import { findByName } from "../../registry/catalog.js";
 import {
   EVALUATING_MESSAGE,
   UNSUPPORTED_REQUEST_MESSAGE,
@@ -101,85 +103,96 @@ export async function handleQuery(ctx: Context): Promise<void> {
       return;
     }
 
-    // Phase 3: Proceed with planning
-    await ctx.api.editMessageText(chatId, evalMsgId, "Planning...");
+    // Phase 3: Get cost estimation (no payment yet)
+    await ctx.api.editMessageText(chatId, evalMsgId, "📝 Planning...");
     const msgId = evalMsgId;
 
-    // Collect steps for real-time updates
-    const steps: StepUpdate[] = [];
-    let lastEditTime = 0;
-    const EDIT_DEBOUNCE_MS = 400;
+    const estimation = await estimateExecution(classification.steps);
 
-    const onStep = async (step: StepUpdate): Promise<void> => {
-      steps[step.stepIndex] = step;
-
-      // Debounce edits to avoid Telegram rate limits
-      const now = Date.now();
-      if (now - lastEditTime < EDIT_DEBOUNCE_MS) return;
-      lastEditTime = now;
-
-      try {
-        const text = buildProgressMessage(steps);
-        await ctx.api.editMessageText(chatId, msgId, text);
-      } catch (e) {
-        // Silently ignore edit failures (message unchanged, rate limit, etc.)
-      }
+    // Phase 3b: Show planning preview (what will happen)
+    const planningDescriptions: Record<string, string> = {
+      Imference: "Generating AI image from description",
+      "dTelecom STT": "Transcribing audio to text",
+      Firecrawl: "Scraping webpage content",
+      Minifetch: "Fetching URL content",
+      Pinata: "Uploading to IPFS",
+      Daydreams: "Running AI inference",
+      BlackSwan: "Analyzing market data",
+      SlamAI: "Analyzing smart money flows",
+      Moltbook: "Generating digest",
     };
 
-    // Run orchestrator
-    const startTime = Date.now();
-    const request: OrchestratorRequest = {
+    const planLines: string[] = [];
+    for (let i = 0; i < classification.steps.length; i++) {
+      const step = classification.steps[i];
+      const catalogEntry = findByName(step.service);
+      const icon = catalogEntry?.icon ?? "⚡";
+      const desc =
+        planningDescriptions[step.service] ||
+        catalogEntry?.description ||
+        step.service;
+      const price = estimation.stepCosts[i] ?? 0.01;
+      planLines.push(`${icon} ${desc}... $${price.toFixed(2)}`);
+    }
+
+    const planningMsg = [
+      "📝 Planning your request... ✔️",
+      "",
+      ...planLines,
+    ].join("\n");
+    await ctx.api.editMessageText(chatId, msgId, planningMsg);
+
+    // Brief pause to let user see the plan
+    await new Promise((r) => setTimeout(r, 1200));
+
+    // Store pending plan in session
+    const session = sessions.get(userId) ?? { userId, queryCount: 0 };
+    session.pendingPlan = {
       query,
-      userId,
-      maxBudget: Math.min(balance, config.MAX_BUDGET_PER_QUERY),
+      steps: classification.steps,
+      classification,
+      estimatedCost: estimation.estimatedTotalCost,
+      messageId: msgId,
+      chatId,
+      timestamp: Date.now(),
     };
-    const result = await runOrchestrator(request, onStep);
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-
-    // Final progress update (only show "Done" if successful)
-    if (result.success) {
-      try {
-        const finalProgress = buildProgressMessage(steps, true);
-        await ctx.api.editMessageText(chatId, msgId, finalProgress);
-      } catch (e) {
-        // Ignore edit failures
-      }
-    } else {
-      // On failure, delete the progress message to avoid confusion
-      try {
-        await ctx.api.deleteMessage(chatId, msgId);
-      } catch (e) {
-        // Ignore deletion failures
-      }
-    }
-
-    // Deduct cost
-    if (result.success) {
-      deduct(userId, result.totalCostUsd);
-    }
-
-    // Update session
-    const session = sessions.get(userId) ?? {
-      userId,
-      queryCount: 0,
-    };
-    session.lastQuery = query;
-    session.lastResult = result;
-    session.lastSteps = steps;
-    session.queryCount++;
     sessions.set(userId, session);
 
-    // Send result as NEW message (separate from progress)
-    const resultText = formatResult(result, userId, elapsed);
+    // Show receipt with confirmation buttons
+    const balance = getBalance(userId);
+    const cost = estimation.estimatedTotalCost;
+    const balanceAfter = Math.max(0, balance - cost);
 
-    await ctx.reply(resultText, {
-      parse_mode: "MarkdownV2",
+    // Format items like a real receipt
+    const items = classification.steps.map((step: any, i: number) => {
+      const catalogEntry = findByName(step.service);
+      const icon = catalogEntry?.icon ?? "⚡";
+      const price = estimation.stepCosts[i] ?? 0.01;
+      return `${icon} ${step.service} — $${price.toFixed(2)}`;
+    });
+
+    const receiptLines = [
+      "🧾 **Confirm Purchase**",
+      "",
+      ...items,
+      "",
+      "━━━━━━━━━━━━━━━━━",
+      `**Total: $${cost.toFixed(2)}**`,
+    ];
+
+    await ctx.api.editMessageText(chatId, msgId, receiptLines.join("\n"), {
+      parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "📋 View receipt", callback_data: `receipt:${userId}` }],
+          [
+            { text: "✅ Approve", callback_data: `confirm_payment:${userId}` },
+            { text: "❌ Cancel", callback_data: `cancel_payment:${userId}` },
+          ],
         ],
       },
     });
+
+    activeQueries.delete(userId); // Allow user to do other things while deciding
   } catch {
     await ctx.reply(ERROR_MESSAGE);
   } finally {
