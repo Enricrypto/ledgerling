@@ -1,29 +1,8 @@
-# Ledgerling
+# Alma
 
-A TypeScript orchestration engine for [x402](https://www.x402.org) micropayments. Ledgerling classifies natural-language requests into paid service calls, estimates costs before charging, and executes them atomically - so users are never silently charged for partial work.
+An AI assistant (Telegram bot + CLI) that lets users access a marketplace of paid AI and data services — image generation, web scraping, crypto analytics, news feeds, and more — by paying small per-request fees automatically via [x402](https://www.x402.org) micropayments.
 
----
-
-## 🤖 New: Telegram Bot (AlmaBot)
-
-Ledgerling now includes a **Telegram bot** that wraps the engine with a conversational UI. Users send natural language queries, watch real-time payment progress, and receive formatted results — all without seeing blockchain, wallets, or crypto.
-
-**Quick start:**
-
-```bash
-npm install
-npm run bot
-```
-
-**Testing without Telegram:**
-
-```bash
-npm run test:bot "What's happening with AI regulation?"
-```
-
-**Full setup guide:** [TELEGRAM_BOT.md](TELEGRAM_BOT.md)  
-**Docker & testing:** [DOCKER_TESTING.md](DOCKER_TESTING.md)  
-**Demo checklist:** [DEMO_CHECKLIST.md](DEMO_CHECKLIST.md)
+No subscriptions. No API keys. Users ask in plain English, Alma routes to the right service, pays on their behalf, and returns the result.
 
 ---
 
@@ -33,7 +12,7 @@ npm run test:bot "What's happening with AI regulation?"
 User query
     │
     ▼
-classifyRequest()       → maps natural language to TaskSteps
+classifyRequest()       → maps natural language to service steps
     │
     ▼
 estimateExecution()     → preflight health checks + cost estimate (no charge)
@@ -42,97 +21,137 @@ estimateExecution()     → preflight health checks + cost estimate (no charge)
   [user approves]
     │
     ▼
-executeSteps()          → sequential x402 payments, atomic on failure
+executeSteps()          → sequential x402 micropayments, atomic on failure
     │
     ▼
-PipelineResult          → results, totalCost, receipts, UX messages
+Result                  → formatted output, cost receipt
 ```
 
-Or use `runPipeline()` to run all three phases in one call.
+Each user gets a dedicated wallet managed by [Openfort](https://openfort.xyz) — no seed phrases, no browser extensions required.
 
 ---
 
-## Project structure
+## Architecture
 
 ```
 src/
-├── pipeline/
-│   └── pipeline.ts          # runPipeline() — full classify → estimate → execute
-├── orchestrator/
-│   └── orchestrator.ts      # estimateExecution(), executeSteps(), checkServiceHealth()
+├── bot/
+│   ├── handlers/
+│   │   ├── query.ts             # Handles user messages, credits, result formatting
+│   │   ├── receipt.ts           # Payment receipt display
+│   │   └── start.ts             # /start command
+│   ├── services/
+│   │   ├── orchestrator.ts      # Bot-specific execution loop with Telegram progress callbacks
+│   │   ├── balance.ts           # USDC balance helpers
+│   │   ├── prompts.ts           # LLM prompt templates
+│   │   └── sessions.ts          # Per-user session state
+│   ├── ui/
+│   │   ├── formatter.ts         # Result → Telegram message formatting
+│   │   ├── messages.ts          # Static message templates
+│   │   └── progress.ts          # Real-time step progress updates
+│   ├── config.ts                # Bot configuration (BOT_TOKEN, credits, limits)
+│   ├── types.ts                 # Shared bot types
+│   └── test-orchestrator.ts     # Test harness (no Telegram required)
 ├── classifier/
-│   ├── classifier.ts        # classifyRequest() — NLP → TaskStep[]
-│   └── types.ts             # MatchContext — shared type for classifier + registry
-├── registry/
-│   └── serviceRegistry.ts   # ServiceRegistry class + defaultRegistry (17 active services)
+│   ├── classifier.ts            # classifyRequest() — NLP → TaskStep[]
+│   └── types.ts                 # MatchContext — shared type for classifier + registry
 ├── capabilities/
-│   └── capabilities.ts      # CapabilityRegistry — 6 active capability groups
+│   └── capabilities.ts          # 6 capability groups
+├── orchestrator/
+│   └── orchestrator.ts          # estimateExecution(), executeSteps(), checkServiceHealth()
+├── pipeline/
+│   └── pipeline.ts              # runPipeline() — full classify → estimate → execute
+├── registry/
+│   ├── serviceRegistry.ts       # ServiceRegistry class + defaultRegistry (17 services)
+│   └── catalog.ts               # Capability catalog for bot UI
+├── server/
+│   ├── app.ts                   # Express x402 paywall server (receive payments)
+│   ├── routes.ts                # Protected route handlers
+│   └── db.ts                    # File-based wallet store (wallets.json)
 ├── services/
-│   ├── fetchWithPayment.ts  # buildFetchWithPayment() — x402-enabled fetch factory
-│   └── openfortSigner.ts    # OpenFort TEE backend wallet adapter
+│   ├── fetchWithPayment.ts      # buildFetchWithPayment() — x402-enabled fetch
+│   ├── userSigner.ts            # Per-user Openfort wallet management
+│   ├── openfortSigner.ts        # Openfort TEE wallet adapter
+│   └── imferencePoller.ts       # Async image generation polling (Imference)
 ├── utils/
-│   ├── logger.ts             # Structured logger (human / JSON)
-│   └── errorHandling.ts      # classifyError(), uxMessageForError()
-├── cli.ts                    # Interactive CLI — wallet detection + payment pipeline
-├── diagnose.ts               # Service health prober
+│   ├── logger.ts                # Structured logger
+│   └── errorHandling.ts         # classifyError(), uxMessageForError()
+├── scripts/
+│   └── generate-qr.ts           # Generate Telegram bot QR code
+├── bot.ts                       # Telegram bot entry point
+├── cli.ts                       # Interactive CLI
+├── diagnose.ts                  # Service health prober
+├── index.ts                     # Programmatic entry point
 └── e2e/
-    └── integration.test.ts   # Live integration tests (gated by LIVE_TEST=1)
+    └── integration.test.ts      # Live integration tests (gated by LIVE_TEST=1)
 ```
 
 ---
 
-## Quick start
+## Installation
 
-### 1. Install
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure credentials
+### 2. Configure environment
 
-Edit `.env` with your signer:
+Copy `.env.example` to `.env` and fill in your values:
 
 ```env
-# Recommended: OpenFort TEE backend wallet
-OPENFORT_SECRET_KEY=sk_test_...
+# ── Openfort (required) ─────────────────────────────────────────────────────
+OPENFORT_SECRET_KEY=sk_...
+OPENFORT_SHIELD_API_KEY=shpk_...
+OPENFORT_SHIELD_SECRET_KEY=...
 
-# Alternative: raw EVM private key (local dev only)
-# EVM_PRIVATE_KEY=0x...
+# ── Telegram bot ─────────────────────────────────────────────────────────────
+BOT_TOKEN=...            # from @BotFather
+BOT_USER_ID=alma-bot     # internal ID for the bot's paying wallet
 
-# Chain: 84532 = Base Sepolia (default), 8453 = Base mainnet
-CHAIN_ID=84532
+# ── Chain ─────────────────────────────────────────────────────────────────────
+CHAIN_ID=8453            # 8453 = Base mainnet, 84532 = Base Sepolia testnet
+RPC_URL=                 # optional custom RPC
+USDC_ADDRESS=0x833589fcd6edb6e08f4c7c32d4f71b54bda02913  # USDC on Base
+
+# ── CLI ────────────────────────────────────────────────────────────────────────
+CLI_USER_ID=test-user-1  # which wallet the CLI uses for payments
+
+# ── x402 paywall server (optional, for receiving payments) ────────────────────
+PAY_TO_ADDRESS=0x...     # your wallet that receives payments
+X402_NETWORK=base
+X402_MAX_AMOUNT=0.10
+PORT=3000
 ```
 
-### 3. Run the unit tests
+### 3. Fund your wallet
 
-Verify everything compiles and all logic is correct before touching the network:
+Run the CLI once to see your wallet address:
 
 ```bash
-npm test
+npm run cli
 ```
 
-Expected output:
+Output:
+```
+🚀 Openfort wallet detected:
+👤 User:    test-user-1
+💳 Address: 0xYourAddress
+⛓ Chain:   8453
+💰 USDC Balance: 0.00 USDC
+```
 
-```
-Test Suites: 6 passed, 6 total
-Tests:       220 passed, 220 total
-```
+Send USDC (Base mainnet) to that address. Each service call costs $0.001–$0.05.
 
 ---
 
-## Running locally
+## Running
 
-There are four entry points. No wallet is needed for the first two.
-
----
-
-### `npm run bot` — Telegram bot (requires BOT_TOKEN)
-
-Starts the Telegram bot. Users interact via Telegram chat — the bot handles classification, payment orchestration, and result formatting. See [TELEGRAM_BOT.md](TELEGRAM_BOT.md) for full setup.
+### Telegram bot
 
 ```bash
-# Start bot (long polling)
+# Start bot
 npm run bot
 
 # Development mode (auto-restart on changes)
@@ -142,224 +161,82 @@ npm run bot:dev
 npm run qr
 ```
 
-**Required env vars:** `BOT_TOKEN`, `OPENFORT_SECRET_KEY` (or `EVM_PRIVATE_KEY`)
+**Required:** `BOT_TOKEN`, `OPENFORT_SECRET_KEY`, USDC in the `alma-bot` wallet.
 
 ---
 
-### `npm run diagnose` — check which services are reachable
+### CLI
 
-Probes all 17 registered x402 endpoints and classifies each result. No charges are incurred.
-
-```bash
-# Probe all services (no wallet needed)
-npm run diagnose
-
-# Check wallet address and balances only
-npm run diagnose -- --wallet
-
-# Machine-readable JSON output
-npm run diagnose -- --json
-```
-
-Expected output:
-
-```
-Ledgerling — Service Diagnostic
-Probing 17 services (timeout: 8s each)…
-
-  ── Research & Web ────────────────────────────────────
-  Service                    Status    HTTP   Latency   Diagnosis
-  ─────────────────────────────────────────────────────────────────────────
-  Firecrawl                  ✅  live  402    312ms     x402 payment required — service is live; use a funded wallet to call it
-  Minifetch                  ✅  live  402    198ms     x402 payment required — service is live; use a funded wallet to call it
-
-  ── Crypto & DeFi ─────────────────────────────────────
-  Service                    Status    HTTP   Latency   Diagnosis
-  ─────────────────────────────────────────────────────────────────────────
-  SLAMai_Signals             ✅  live  402    541ms     x402 payment required — service is live; use a funded wallet to call it
-  ...
-
-────────────────────────────────────────────────────────────
-  Total services          : 17
-  ✅  Live                : 14
-  ⚠   Endpoint errors     : 2
-  ❌  Unreachable/timeout  : 1
-```
-
-**Status tiers:**
-
-| Icon | Tier           | Meaning                                                       |
-| ---- | -------------- | ------------------------------------------------------------- |
-| ✅   | `live`         | HTTP 2xx or 402 — service is up and enforcing x402            |
-| ⚠    | `endpoint_err` | Server responded but URL or auth is wrong (4xx ≠ 402, or 5xx) |
-| ❌   | `unreachable`  | Network error or timeout — couldn't reach the server          |
-
-A **402** response is the expected healthy status for an x402 service — it means the service is live and correctly gating access behind a micropayment. You need a funded wallet to get a 200.
-
-#### `--wallet` mode — check balances without probing services
-
-```bash
-npm run diagnose -- --wallet
-```
-
-```
-🚀 WALLET MODE ACTIVE
-💳 Address: 0xYourWalletAddress
-⛽  Chain:  84532
-⛽ ETH Balance: 0.042 ETH
-💰 USDC Balance: 10.00 USDC
-✅ Wallet ready - x402 payments would work here
-```
-
-Requires `EVM_PRIVATE_KEY` and `CHAIN_ID` in `.env`.
-
-#### JSON output (safe to pipe to `jq`)
-
-```bash
-npm run diagnose -- --json
-npm run diagnose -- --json | jq '[.[] | select(.tier == "unreachable")]'
-npm run diagnose -- --json | jq '[.[] | select(.statusCode == 402)] | length'
-```
-
----
-
-### `npm run cli` — interactive payment pipeline
-
-Runs the full wallet detection → classify → estimate → confirm → execute flow in your terminal. No charges until you explicitly confirm.
+Interactive payment pipeline — classify, estimate, confirm, execute.
 
 ```bash
 # Interactive prompt
 npm run cli
 
 # Inline query
+npm run cli "generate an image of a futuristic city"
 npm run cli "scrape https://example.com"
 
 # Dry-run: classify + estimate only, no payment prompt
-npm run cli -- --dry-run "get the latest ETH and BTC prices"
+npm run cli -- --dry-run "get the latest ETH price"
 ```
 
-#### CLI flow
-
-When you run the CLI, it always:
-
-1. **Detects your wallet** — reads `EVM_PRIVATE_KEY` + `CHAIN_ID` from `.env`, connects to the RPC, and shows your ETH and USDC balances.
-2. **Accepts a query** — inline arg or interactive prompt.
-3. **Classifies** — maps the query to one or more service steps.
-4. **Preflight estimate** — health-checks each service and shows cost breakdown (no charge).
-5. **Confirms** — asks `Proceed and authorise payment? (y/N)`. You can abort here.
-6. **Executes** — pays each step atomically via x402. Halts and reports if any step fails.
-
-#### What you'll see — startup + dry-run
+Example output:
 
 ```
-🔗 Ledgerling — x402 payment pipeline
+🔗 Alma — x402 payment pipeline
 
-🚀 Wallet detected:
+🚀 Openfort wallet detected:
+👤 User:    test-user-1
 💳 Address: 0xYourAddress
-⛽ Chain: 84532
-⛽ ETH Balance: 0.042 ETH
-💰 USDC Balance: 10.00 USDC
+⛓ Chain:   8453
+💰 USDC Balance: 4.35 USDC
 
-  Query: get the latest ETH and BTC prices
+  Query: generate an image of a futuristic city
 
   Running preflight checks…
 
 ────────────────────────────────────────────────────────────
  Execution plan
 ────────────────────────────────────────────────────────────
-Ledgerling will execute 1 step:
-  1. BlackSwan — Crypto news, market sentiment & risk signals (~$0.0300)
+Alma will execute 1 step:
+  1. Imference — AI image generation (~$0.0500)
 
-Estimated total: ~$0.0300 USD
-
-  --dry-run flag set. No charges were incurred.
-```
-
-#### What you'll see — full execution (funded wallet required)
-
-```
-🔗 Ledgerling — x402 payment pipeline
-
-🚀 Wallet detected:
-💳 Address: 0xYourAddress
-⛽ Chain: 84532
-⛽ ETH Balance: 0.042 ETH
-💰 USDC Balance: 10.00 USDC
-
-  Query: scrape https://example.com
-
-  Running preflight checks…
-
-────────────────────────────────────────────────────────────
- Execution plan
-────────────────────────────────────────────────────────────
-Ledgerling will execute 1 step:
-  1. Firecrawl — Web scraping & crawling (~$0.0100)
-
-Estimated total: ~$0.0100 USD
+Estimated total: ~$0.0500 USD
 
   Proceed and authorise payment? (y/N): y
 
   Executing steps…
 
+  ⏳ Image generating… (request_id: abc123)
+  ✓ Image ready: https://blob.imference.com/large/....webp
+
 ────────────────────────────────────────────────────────────
- ✓  Done
+ ✓ Done
 ────────────────────────────────────────────────────────────
-All 1 step completed successfully. Total charged: $0.0100 USD.
-
-  Step 1 result:
-  {
-    "content": "...",
-    "url": "https://example.com"
-  }
-```
-
-#### Out-of-scope queries exit cleanly
-
-```bash
-npm run cli -- --dry-run "book me a flight to Paris"
-```
-
-```
-────────────────────────────────────────────────────────────
- Out of scope
-────────────────────────────────────────────────────────────
-Ledgerling currently supports:
-• Research & web scraping
-• Market & news intelligence
-• Crypto & DeFi analytics
-• AI inference, image generation & transcription
-• Security scanning & compliance
-• IPFS storage & paid links
-Your request doesn't match available paid services yet.
-```
-
-#### More example queries to try
-
-```bash
-# Multi-service — routes to two steps
-npm run cli -- --dry-run "get crypto news and check sentiment on ETH"
-npm run cli -- --dry-run "scrape https://example.com and summarize it"
-
-# Single-service
-npm run cli -- --dry-run "upload a file to IPFS"
-npm run cli -- --dry-run "transcribe https://audio.example.com/clip.mp3"
-npm run cli -- --dry-run "generate an image of a futuristic city"
-npm run cli -- --dry-run "check wallet intel for 0xAbCd..."
-npm run cli -- --dry-run "show my DeFi positions"
+All 1 step completed successfully.
+Total charged: $0.0500 USD
 ```
 
 ---
 
-### `npm start` — programmatic entry point
+### Service health check
 
-Runs `src/index.ts` directly — use this as a starting point for your own integration:
+Probes all registered x402 endpoints. No charges incurred.
 
 ```bash
-npm start
+npm run diagnose
 ```
 
-The default `src/index.ts` calls a single x402 endpoint using `buildFetchWithPayment()`. Edit it to call `runPipeline()` or `executeSteps()` directly with your own query and registry.
+---
+
+### x402 paywall server (optional)
+
+Run your own x402-protected endpoint to receive micropayments:
+
+```bash
+npx tsx src/server/app.ts
+```
 
 ---
 
@@ -374,214 +251,72 @@ The default `src/index.ts` calls a single x402 endpoint using `buildFetchWithPay
 | Security & Compliance | MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop                         |
 | Storage & Content     | PinataIPFS_Upload, PinataIPFS_Get                                                          |
 
-17 services total across 6 capability groups.
-
----
-
-## API reference
-
-### `runPipeline(userQuery, fetchFn, options?)`
-
-Full pipeline in one call.
-
-```typescript
-const result: PipelineResult = await runPipeline(
-  "get ETH price and generate a chart",
-  fetchFn,
-  {
-    dryRun: false, // true = estimate only, no charges
-    continueOnUnhealthy: false, // true = proceed even if a service is down
-    stepTimeoutMs: 30_000, // per-step timeout (0 = disabled)
-    registry // optional custom ServiceRegistry
-  }
-)
-```
-
-`PipelineResult` fields:
-
-| Field            | Type                     | Description                                               |
-| ---------------- | ------------------------ | --------------------------------------------------------- |
-| `query`          | `string`                 | The original user query                                   |
-| `classification` | `ClassificationResult`   | Classifier output                                         |
-| `estimation`     | `OrchestratorEstimation` | Preflight cost + health                                   |
-| `execution`      | `OrchestratorResult`     | Execution results (absent on dryRun/abort)                |
-| `dryRun`         | `boolean`                | Whether execution was skipped                             |
-| `abortedReason`  | `string?`                | Why execution was skipped (out-of-scope, unhealthy, etc.) |
-
----
-
-### `estimateExecution(steps, registry?)`
-
-Runs preflight health checks and builds a cost estimate without charging:
-
-```typescript
-const est = await estimateExecution(steps)
-
-console.log(est.uxSummary)
-// Ledgerling will execute 2 steps:
-//   1. Firecrawl — Web scraping & crawling (~$0.0100)
-//   2. BlackSwan — Crypto news, market sentiment & risk signals (~$0.0300)
-//
-// Estimated total: ~$0.0400 USD
-
-if (!est.healthy) {
-  console.warn("Unavailable services:", est.unavailableServices)
-}
-```
-
----
-
-### `executeSteps(steps, fetchFn, options?)`
-
-Atomic sequential execution. Halts on first failure and reports exactly what was charged before the failure.
-
-```typescript
-const result = await executeSteps(steps, fetchFn, {
-  stepTimeoutMs: 15_000,
-  registry
-})
-
-if (result.success) {
-  console.log(result.uxMessage) // "All 2 steps completed successfully."
-  console.log(result.totalCost) // actual USD from x402 receipts
-} else {
-  console.error(result.uxMessage) // includes charge notice for prior steps
-  console.error(result.failedStep) // which step failed
-}
-```
-
----
-
-### `classifyRequest(userQuery, registry?)`
-
-Maps a natural-language query to a list of `TaskStep` objects. Passes an optional registry to classify against a custom service set; defaults to `defaultRegistry`.
-
-```typescript
-const { inScope, steps, fallbackMessage } = classifyRequest(
-  "get the ETH price and check for fraudulent activity on 0xAbCd..."
-)
-// steps = [
-//   { capability: "Market & News", service: "BlackSwan", query: { topic: "..." } },
-//   { capability: "Security & Compliance", service: "MerchantGuard_Score", query: { message: "..." } },
-// ]
-```
-
----
-
-### `ServiceRegistry`
-
-The classifier is fully registry-driven — every service carries its own `classification` phrases, keywords, and `buildQuery` function inside its `ServiceConfig`. Adding a new service requires only one file edit.
-
-```typescript
-import {
-  ServiceRegistry,
-  defaultRegistry
-} from "./src/registry/serviceRegistry.js"
-import type { MatchContext } from "./src/classifier/types.js"
-
-// Extend the default registry with a new x402 service
-const registry = defaultRegistry.clone()
-registry.register("MyService", {
-  url: "https://api.myservice.io/v1/run",
-  estimatedCost: 0.05,
-  description: "My custom x402 service",
-  inputSchemaHint: { query: "Input query" },
-  capability: "Utility",
-  classification: {
-    phrases: ["my service", "run myservice"],
-    keywords: ["myservice"]
-  },
-  buildQuery: (raw: string, _ctx: MatchContext) => ({ query: raw })
-})
-
-await runPipeline(query, fetchFn, { registry })
-```
-
-`ServiceConfig` fields:
-
-| Field                     | Type                     | Description                                                         |
-| ------------------------- | ------------------------ | ------------------------------------------------------------------- |
-| `url`                     | `string`                 | POST endpoint for the x402 service                                  |
-| `estimatedCost`           | `number`                 | USD cost hint for preflight estimates                               |
-| `description`             | `string`                 | Human-readable label shown in UX summaries                          |
-| `inputSchemaHint`         | `Record<string, string>` | Documents expected POST body fields                                 |
-| `capability`              | `Capability`             | Which capability group this service belongs to                      |
-| `classification.phrases`  | `string[]`               | Multi-word or unambiguous single-term triggers (3 pts each)         |
-| `classification.keywords` | `string[]`               | Supporting single-word signals (1 pt each; 2 pts required to match) |
-| `buildQuery`              | `(raw, ctx) => object`   | Builds the POST body from the user query and extracted entities     |
-
-`MatchContext` (passed to `buildQuery`) contains extracted entities from the query: `urls`, `walletAddresses`, `ipAddresses`, `cryptoSymbols`, and the original `raw` string.
-
----
-
-## Error handling
-
-`classifyError(err)` maps any raw error string to a typed `ErrorKind`:
-
-| Kind             | Trigger                             | Charge status           |
-| ---------------- | ----------------------------------- | ----------------------- |
-| `TIMEOUT`        | Request exceeded `stepTimeoutMs`    | Ambiguous — see receipt |
-| `NETWORK_ERROR`  | DNS/connection failure              | Not charged             |
-| `PAYMENT_FAILED` | 402 rejected / insufficient balance | Not charged             |
-| `SERVICE_ERROR`  | Service returned a failure          | Not charged             |
-
-`uxMessageForError(kind, service)` returns a plain-English sentence safe to show users.
-
----
-
-## Wallet setup
-
-### OpenFort (recommended)
-
-A server-side TEE wallet — no private key in your environment:
-
-```env
-OPENFORT_SECRET_KEY=sk_test_...
-```
-
-### Raw private key (local dev only)
-
-```env
-EVM_PRIVATE_KEY=0x...
-```
-
-Fund the wallet with USDC on the selected chain before running.
+17 services across 6 capability groups.
 
 ---
 
 ## Testing
 
 ```bash
-# Unit tests — all 6 suites, e2e excluded (no network, no wallet needed)
+# Unit tests — no network, no wallet needed
 npm test
 
-# Live integration tests — requires credentials and a reachable x402 endpoint
-LIVE_TEST=1 npm run test:live
+# Expected output:
+# Test Suites: 6 passed, 6 total
+# Tests:       220 passed, 220 total
 
-# Point live tests at a specific endpoint
-X402_TEST_URL=https://your-x402-server.io/api LIVE_TEST=1 npm run test:live
+# Test bot orchestrator without Telegram
+npm run test:bot "What's the latest on ETH?"
+
+# Test x402 payment end-to-end (requires funded wallet)
+npm run test:payment
+
+# Live integration tests (requires credentials + live endpoints)
+LIVE_TEST=1 npm run test:live
 ```
 
-6 suites, 220 unit tests covering classifier, registry, capabilities, orchestrator, pipeline, and fetchWithPayment. The e2e suite in `src/e2e/` is excluded from `npm test` and only runs when `LIVE_TEST=1` is set.
+---
+
+## Wallet system
+
+Each user gets a dedicated Openfort backend wallet:
+
+- **Created once** on first use, address saved to `wallets.json`
+- **Idempotent** — same `userId` always resolves to the same wallet, even if `wallets.json` is lost
+- **No private keys** in your environment — Openfort manages signing via TEE
+- **Bot wallet** (`alma-bot`) pays for all Telegram bot requests; fund it with USDC on Base
+
+```
+wallets.json (project root)
+├── "test-user-1" → { address: "0x13b2...", createdAt: ... }
+└── "alma-bot"    → { address: "0xAbCd...", createdAt: ... }
+```
 
 ---
 
 ## Environment variables
 
-| Variable              | Required       | Description                                                             |
-| --------------------- | -------------- | ----------------------------------------------------------------------- |
-| `OPENFORT_SECRET_KEY` | One of the two | OpenFort TEE backend wallet key                                         |
-| `EVM_PRIVATE_KEY`     | One of the two | Raw EVM private key (dev only)                                          |
-| `CHAIN_ID`            | No             | `84532` (Base Sepolia, default) or `8453` (Base mainnet)                |
-| `RPC_URL`             | No             | Custom RPC endpoint for the selected chain                              |
-| `USDC_ADDRESS`        | No             | USDC contract address on the selected chain (for balance display)       |
-| `LOG_FORMAT`          | No             | Set to `json` for newline-delimited JSON logs                           |
-| `LIVE_TEST`           | No             | Set to `1` to run live integration tests                                |
-| `X402_TEST_URL`       | No             | x402 endpoint for live tests (default: `https://x402index.com/api/all`) |
+| Variable                   | Required | Description                                                       |
+| -------------------------- | -------- | ----------------------------------------------------------------- |
+| `OPENFORT_SECRET_KEY`      | Yes      | Openfort secret key for wallet creation and signing               |
+| `OPENFORT_SHIELD_API_KEY`  | Yes      | Openfort Shield publishable key                                   |
+| `OPENFORT_SHIELD_SECRET_KEY` | Yes    | Openfort Shield secret key                                        |
+| `BOT_TOKEN`                | Bot only | Telegram bot token from @BotFather                                |
+| `BOT_USER_ID`              | No       | Internal user ID for the bot wallet (default: `alma-bot`)         |
+| `CLI_USER_ID`              | No       | Internal user ID for the CLI wallet (default: `default`)          |
+| `CHAIN_ID`                 | No       | `8453` (Base mainnet) or `84532` (Base Sepolia, default)          |
+| `RPC_URL`                  | No       | Custom RPC endpoint                                               |
+| `USDC_ADDRESS`             | No       | USDC contract address on the selected chain                       |
+| `PAY_TO_ADDRESS`           | Server   | Wallet address that receives x402 payments on your server         |
+| `X402_NETWORK`             | Server   | Network for the paywall server (e.g. `base`)                      |
+| `X402_MAX_AMOUNT`          | Server   | Max payment amount accepted (e.g. `0.10`)                         |
+| `PORT`                     | No       | Paywall server port (default: `3000`)                             |
+| `LIVE_TEST`                | No       | Set to `1` to run live integration tests                          |
+| `IMFERENCE_DEFAULT_MODEL`  | No       | Image generation model (default: `nova3dcgxl`)                    |
 
-### Service proxy URLs
+### Service URL overrides
 
-Each service has an optional `*_X402_URL` environment variable that overrides its default host. Set these to point a service at a real x402 proxy once you have verified endpoints. Without them, the placeholder hosts remain in place and `npm run diagnose` will report `ENOTFOUND`.
+Each service has an optional `*_X402_URL` variable to override its default endpoint:
 
 | Variable                 | Service(s)                                                         |
 | ------------------------ | ------------------------------------------------------------------ |
@@ -598,11 +333,38 @@ Each service has an optional `*_X402_URL` environment variable that overrides it
 | `MERCHANTGUARD_X402_URL` | MerchantGuard_Score, MerchantGuard_Scan, MerchantGuard_MysteryShop |
 | `PINATA_X402_URL`        | PinataIPFS_Upload, PinataIPFS_Get                                  |
 
-To activate a service, add the variable to `.env` and restart:
+---
 
-```env
-FIRECRAWL_X402_URL=https://foldset.xyz/firecrawl
-SLAMAI_X402_URL=https://zauthx402.com/slamai
+## Adding a new service
+
+Services are fully registry-driven. Add one entry to `src/registry/serviceRegistry.ts`:
+
+```typescript
+registry.register("MyService", {
+  url: "https://api.myservice.io/v1/run",
+  estimatedCost: 0.02,
+  description: "What this service does",
+  inputSchemaHint: { query: "Input description" },
+  capability: "Research & Web",
+  classification: {
+    phrases: ["run myservice", "use myservice"],
+    keywords: ["myservice"]
+  },
+  buildQuery: (raw, ctx) => ({ query: raw })
+})
 ```
 
-`npm run diagnose` will then show those services as ✅ live instead of ❌ ENOTFOUND.
+The classifier will automatically route matching queries to it. No other files need changing.
+
+---
+
+## Error handling
+
+| Kind             | Cause                               | Charge status           |
+| ---------------- | ----------------------------------- | ----------------------- |
+| `TIMEOUT`        | Request exceeded step timeout       | Ambiguous — check receipt |
+| `NETWORK_ERROR`  | DNS / connection failure            | Not charged             |
+| `PAYMENT_FAILED` | 402 rejected / insufficient balance | Not charged             |
+| `SERVICE_ERROR`  | Service returned a failure response | Not charged             |
+
+All errors surface as plain-English messages safe to show users — no blockchain terminology.
