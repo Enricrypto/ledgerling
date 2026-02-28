@@ -3,7 +3,6 @@ import { registerExactEvmScheme } from "@x402/evm/exact/client"
 import type { ClientEvmSigner } from "@x402/evm"
 import { createPublicClient, http } from "viem"
 import { base, baseSepolia } from "viem/chains"
-import { privateKeyToAccount } from "viem/accounts"
 import { createOpenfortSigner, type EvmSignerLike } from "./openfortSigner.js"
 
 export interface FetchResult {
@@ -69,22 +68,10 @@ export async function buildFetchWithPayment() {
 // ---------------------------------------------------------------------------
 
 async function resolveSigner(): Promise<EvmSignerLike> {
-  if (process.env.OPENFORT_SECRET_KEY) {
-    return createOpenfortSigner()
+  if (!process.env.OPENFORT_SECRET_KEY) {
+    throw new Error("Missing env var: OPENFORT_SECRET_KEY")
   }
-
-  if (process.env.EVM_PRIVATE_KEY) {
-    const account = privateKeyToAccount(process.env.EVM_PRIVATE_KEY as `0x${string}`)
-    return {
-      address: account.address,
-      signTypedData: (args) => account.signTypedData(args as any),
-    }
-  }
-
-  throw new Error(
-    "No signer configured. Set OPENFORT_SECRET_KEY (recommended) " +
-    "or EVM_PRIVATE_KEY in your .env file."
-  )
+  return createOpenfortSigner()
 }
 
 /**

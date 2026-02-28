@@ -5,7 +5,7 @@
  * Usage:
  *   npm run cli                          # interactive prompt
  *   npm run cli "scrape https://example.com"
- *   npm run cli -- --dry-run "get ETH price"
+ *   npm run cli -- --dry-run "get USDC price"
  */
 
 import "dotenv/config"
@@ -14,6 +14,7 @@ import { stdin as input, stdout as output } from "node:process"
 import { buildFetchWithPayment } from "./services/fetchWithPayment.js"
 import { classifyRequest, FALLBACK_MESSAGE } from "./classifier/classifier.js"
 import { estimateExecution, executeSteps } from "./orchestrator/orchestrator.js"
+import { createOpenfortSigner } from "./services/openfortSigner.js"
 import { ethers } from "ethers"
 import type { MatchContext } from "./classifier/types.js"
 
@@ -50,42 +51,47 @@ const rl = readline.createInterface({ input, output })
 // Wallet — always show first
 // ---------------------------------------------------------------------------
 async function showWallet() {
-  if (!process.env.EVM_PRIVATE_KEY || !process.env.CHAIN_ID) {
-    print("❌ Missing EVM_PRIVATE_KEY or CHAIN_ID in .env")
+  if (!process.env.OPENFORT_SECRET_KEY || !process.env.CHAIN_ID) {
+    print("❌ Missing OPENFORT_SECRET_KEY or CHAIN_ID in .env")
+    return null
+  }
+
+  let address: string
+  try {
+    const signer = await createOpenfortSigner()
+    address = signer.address
+  } catch (err: any) {
+    console.error("[Openfort debug]", err)
+    print(`❌ Could not load Openfort wallet: ${err.message}`)
     return null
   }
 
   const chainId = Number(process.env.CHAIN_ID)
-  const rpcUrl = process.env.RPC_URL ?? "https://base-sepolia.public.rpc.url"
+  const rpcUrl = process.env.RPC_URL ?? "https://mainnet.base.org"
   const provider = new ethers.JsonRpcProvider(rpcUrl, chainId)
-  const wallet = new ethers.Wallet(process.env.EVM_PRIVATE_KEY, provider)
 
-  print("\n🚀 Wallet detected:")
-  print(`💳 Address: ${wallet.address}`)
-  print(`⛽ Chain: ${chainId}`)
-
-  try {
-    const ethBalance = await provider.getBalance(wallet.address)
-    print(`⛽ ETH Balance: ${ethers.formatEther(ethBalance)} ETH`)
-  } catch (err: any) {
-    print(`⚠ Could not fetch ETH balance: ${err.message}`)
-  }
+  print("\n🚀 Openfort wallet detected:")
+  print(`💳 Address: ${address}`)
+  print(`⛓ Chain: ${chainId}`)
 
   try {
-    const USDC_ADDRESS =
-      process.env.USDC_ADDRESS ?? "0xYourSepoliaUSDCAddressHere"
-    const ERC20 = new ethers.Contract(
-      USDC_ADDRESS,
-      ["function balanceOf(address) view returns (uint256)"],
-      provider
-    )
-    const usdcBalance = await ERC20.balanceOf(wallet.address)
-    print(`💰 USDC Balance: ${ethers.formatUnits(usdcBalance, 6)} USDC`)
+    const USDC_ADDRESS = process.env.USDC_ADDRESS ?? process.env.X402_ASSET_ADDRESS ?? ""
+    if (!USDC_ADDRESS) {
+      print(`⚠ Set USDC_ADDRESS or X402_ASSET_ADDRESS to show USDC balance`)
+    } else {
+      const ERC20 = new ethers.Contract(
+        USDC_ADDRESS,
+        ["function balanceOf(address) view returns (uint256)"],
+        provider
+      )
+      const usdcBalance = await ERC20.balanceOf(address)
+      print(`💰 USDC Balance: ${ethers.formatUnits(usdcBalance, 6)} USDC`)
+    }
   } catch (err: any) {
     print(`⚠ Could not fetch USDC balance: ${err.message}`)
   }
 
-  return wallet
+  return { address }
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +120,7 @@ async function main() {
   // 3️⃣ Build MatchContext with wallet prefilled
   const ctx: MatchContext = {
     urls: [], // will be filled later if user provides URL
-    walletAddresses: wallet ? [wallet.address] : [],
+    walletAddresses: wallet ? [wallet.address] : [],  // address from Openfort
     ipAddresses: [],
     cryptoSymbols: [],
     raw: query
@@ -174,7 +180,7 @@ async function main() {
     fetchFn = await buildFetchWithPayment()
   } catch (err: any) {
     print(`\n  ✗ Wallet error: ${err.message}`)
-    print("  Check your .env (OPENFORT_SECRET_KEY or EVM_PRIVATE_KEY).\n")
+    print("  Check your .env (OPENFORT_SECRET_KEY).\n")
     rl.close()
     process.exit(1)
   }
