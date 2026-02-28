@@ -10,7 +10,9 @@ import { config } from "./bot/config.js";
 import { handleStart } from "./bot/handlers/start.js";
 import { handleQuery } from "./bot/handlers/query.js";
 import { handleReceiptCallback } from "./bot/handlers/receipt.js";
+import { handleHappyPath } from "./bot/handlers/happyPath.js";
 import { getBalance, formatBalance } from "./bot/services/balance.js";
+import { sessions } from "./bot/services/sessions.js";
 import { pendingPrompts } from "./bot/services/prompts.js";
 import { HELP_MESSAGE, NON_TEXT_MESSAGE } from "./bot/ui/messages.js";
 import {
@@ -37,9 +39,47 @@ bot.command("help", async (ctx) => {
   await ctx.reply(HELP_MESSAGE);
 });
 
+bot.command("happy_path", handleHappyPath);
+
 // ── Callback queries (inline buttons) ────────────────────────────────────────
 
 bot.callbackQuery(/^receipt:/, handleReceiptCallback);
+
+bot.callbackQuery(/^approve_report:/, async (ctx) => {
+  await ctx.answerCallbackQuery();
+
+  const userId = ctx.callbackQuery?.data?.split(":")[1];
+  if (!userId) return;
+
+  const session = sessions.get(userId);
+  if (!session?.pendingReport) {
+    await ctx.reply("No pending report found.");
+    return;
+  }
+
+  // Simulate processing with typing action and delay
+  await ctx.replyWithChatAction("typing");
+  const processingMsg = await ctx.reply("Processing payment...");
+
+  await new Promise((r) => setTimeout(r, 1500));
+
+  // Delete processing message
+  try {
+    await ctx.api.deleteMessage(
+      processingMsg.chat.id,
+      processingMsg.message_id,
+    );
+  } catch {
+    /* ignore */
+  }
+
+  // Deliver the report
+  await ctx.reply(session.pendingReport);
+
+  // Clear pending report
+  session.pendingReport = undefined;
+  sessions.set(userId, session);
+});
 
 bot.callbackQuery(/^services:/, async (ctx) => {
   const [, answer] = ctx.callbackQuery.data.split(":");
@@ -116,6 +156,9 @@ bot.callbackQuery(/^try:/, async (ctx) => {
 });
 
 // ── Text messages → orchestrator ─────────────────────────────────────────────
+
+// Openfort demo trigger
+bot.hears(/openfort/i, handleHappyPath);
 
 bot.on("message:text", handleQuery);
 

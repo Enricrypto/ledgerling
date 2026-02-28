@@ -13,8 +13,8 @@
     "qr": "npx tsx src/scripts/generate-qr.ts",
     "test:bot": "npx tsx src/bot/test-orchestrator.ts",
     "build": "tsc",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest",
-    "test:live": "LIVE_TEST=1 node --experimental-vm-modules node_modules/.bin/jest src/e2e"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:live": "cross-env LIVE_TEST=1 node --experimental-vm-modules node_modules/jest/bin/jest.js src/e2e"
   },
   "keywords": [],
   "author": "",
