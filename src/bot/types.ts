@@ -40,5 +40,6 @@ export interface UserSession {
   lastQuery?: string;
   lastResult?: BotOrchestratorResult;
   lastSteps?: StepUpdate[];
+  pendingReport?: string;
   queryCount: number;
 }
