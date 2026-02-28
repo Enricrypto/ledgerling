@@ -3,6 +3,9 @@ import { registerExactEvmScheme } from "@x402/evm/exact/client"
 import type { ClientEvmSigner } from "@x402/evm"
 import { createPublicClient, http } from "viem"
 import { base, baseSepolia } from "viem/chains"
+import { writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { EvmSignerLike } from "./openfortSigner.js"
 
 export interface FetchResult {
@@ -40,18 +43,33 @@ export async function buildFetchWithPayment(signer: EvmSignerLike) {
     try {
       const response = await wrappedFetch(url, options)
 
-      const resultBody = await response.json().catch(() => undefined)
+      const contentType = response.headers.get("content-type") ?? ""
+      const rawText = await response.text().catch(() => "")
+      let resultBody: any
+      if (contentType.startsWith("image/")) {
+        const ext = contentType.includes("png") ? "png" : contentType.includes("gif") ? "gif" : "jpg"
+        const filePath = join(tmpdir(), `ledgerling-${Date.now()}.${ext}`)
+        const buffer = Buffer.from(rawText, "binary")
+        writeFileSync(filePath, buffer)
+        resultBody = { _type: "image", filePath, bytes: buffer.length }
+      } else {
+        try { resultBody = JSON.parse(rawText) } catch { resultBody = rawText || undefined }
+      }
 
       let cost: number | undefined
       let receipt: any | undefined
 
       if (response.ok) {
         const httpClient = new x402HTTPClient(x402)
-        receipt = httpClient.getPaymentSettleResponse((name) =>
-          response.headers.get(name)
-        )
-        if (receipt?.amount) {
-          cost = Number(receipt.amount)
+        try {
+          receipt = httpClient.getPaymentSettleResponse((name) =>
+            response.headers.get(name)
+          )
+          if (receipt?.amount) {
+            cost = Number(receipt.amount)
+          }
+        } catch {
+          // Some x402v1 servers don't return a settlement header — payment still succeeded.
         }
       }
 

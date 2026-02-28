@@ -9,7 +9,8 @@
 import { classifyRequest } from "../../classifier/classifier.js";
 import { defaultRegistry } from "../../registry/serviceRegistry.js";
 import { buildFetchWithPayment } from "../../services/fetchWithPayment.js";
-import { logger } from "../../utils/logger.js";
+import { getOrCreateUserSigner } from "../../services/userSigner.js";
+import { pollImferenceResult } from "../../services/imferencePoller.js";
 import { classifyError, uxMessageForError } from "../../utils/errorHandling.js";
 import type { TaskStep } from "../../classifier/classifier.js";
 import type { FetchResult } from "../../services/fetchWithPayment.js";
@@ -19,11 +20,20 @@ import type {
   StepUpdate,
 } from "../types.js";
 
+// Bot pays for all x402 requests using a dedicated bot wallet.
+// BOT_USER_ID in .env controls which Openfort wallet is used (defaults to "alma-bot").
+const BOT_USER_ID = process.env.BOT_USER_ID ?? "alma-bot";
+
 // Build fetch once at module load
 let fetchFn: Awaited<ReturnType<typeof buildFetchWithPayment>> | null = null;
+let signerAddress: string | null = null;
 
 async function getFetchFn() {
-  if (!fetchFn) fetchFn = await buildFetchWithPayment();
+  if (!fetchFn) {
+    const signer = await getOrCreateUserSigner(BOT_USER_ID);
+    signerAddress = signer.address;
+    fetchFn = await buildFetchWithPayment(signer);
+  }
   return fetchFn;
 }
 
@@ -48,6 +58,16 @@ export async function runOrchestrator(
   const steps = classification.steps;
   const totalSteps = steps.length;
 
+  // Inject bot wallet address into steps that require the payer's address (e.g. Imference)
+  const fetch402 = await getFetchFn();
+  if (signerAddress) {
+    for (const step of steps) {
+      if (step.service === "Imference" && !step.query.address) {
+        step.query.address = signerAddress;
+      }
+    }
+  }
+
   // 2. Emit "pending" for all steps
   steps.forEach((step, i) => {
     const config = defaultRegistry.get(step.service);
@@ -62,7 +82,6 @@ export async function runOrchestrator(
   });
 
   // 3. Execute each step, emitting "paying" → "done"/"error"
-  const fetch402 = await getFetchFn();
   const results: any[] = [];
   const stepUpdates: StepUpdate[] = [];
   let totalCost = 0;
@@ -72,10 +91,6 @@ export async function runOrchestrator(
     const config = defaultRegistry.get(step.service);
     const url =
       config?.url ?? `https://api.ledgerling.io/${step.service.toLowerCase()}`;
-
-    logger.info(`Bot Step ${i + 1}/${totalSteps}: calling ${step.service}`, {
-      url,
-    });
 
     // Emit "paying"
     const update: StepUpdate = {
@@ -121,7 +136,17 @@ export async function runOrchestrator(
       // Cost is in USD (from x402 receipt.amount)
       const costUsd = result.cost ?? 0;
       totalCost += costUsd;
-      results.push(result.result);
+
+      // Imference is async: initial 200 returns { request_id }, image must be polled
+      let stepResult = result.result;
+      if (step.service === "Imference" && stepResult?.request_id) {
+        const imageUrl = await pollImferenceResult(stepResult.request_id);
+        stepResult = imageUrl
+          ? { ...stepResult, url: imageUrl }
+          : stepResult; // keep request_id so user can check manually
+      }
+
+      results.push(stepResult);
       update.status = "done";
       update.costUsd = costUsd;
 
@@ -134,17 +159,10 @@ export async function runOrchestrator(
           result.receipt.txHash ??
           result.receipt.tx;
 
-        // Log receipt structure for debugging during first runs
-        if (!update.txHash) {
-          logger.warn("No txHash found in receipt", {
-            receipt: result.receipt,
-          });
-        }
       }
     } else {
       update.status = "error";
       update.error = result.error;
-      logger.error(`${step.service} failed`, { error: result.error });
     }
 
     stepUpdates.push({ ...update });

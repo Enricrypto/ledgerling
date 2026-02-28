@@ -18,8 +18,8 @@ import { buildFetchWithPayment } from "./services/fetchWithPayment.js"
 import { classifyRequest, FALLBACK_MESSAGE } from "./classifier/classifier.js"
 import { estimateExecution, executeSteps } from "./orchestrator/orchestrator.js"
 import { getOrCreateUserSigner } from "./services/userSigner.js"
+import { pollImferenceResult } from "./services/imferencePoller.js"
 import { ethers } from "ethers"
-import type { MatchContext } from "./classifier/types.js"
 
 // ---------------------------------------------------------------------------
 // Args
@@ -66,7 +66,6 @@ async function showWallet() {
   try {
     signer = await getOrCreateUserSigner(CLI_USER_ID)
   } catch (err: any) {
-    console.error("[Openfort debug]", err)
     print(`❌ Could not load wallet for user "${CLI_USER_ID}": ${err.message}`)
     return null
   }
@@ -124,17 +123,17 @@ async function main() {
     process.exit(0)
   }
 
-  // 3️⃣ Build MatchContext with wallet prefilled
-  const ctx: MatchContext = {
-    urls: [],
-    walletAddresses: wallet ? [wallet.address] : [],
-    ipAddresses: [],
-    cryptoSymbols: [],
-    raw: query
-  }
-
-  // 4️⃣ Classify query
+  // 3️⃣ Classify query
   const classification = classifyRequest(query)
+
+  // Inject wallet address into service steps that require the payer's address (e.g. Imference)
+  if (wallet) {
+    for (const step of classification.steps) {
+      if (step.service === "Imference" && !step.query.address) {
+        step.query.address = wallet.address
+      }
+    }
+  }
 
   if (!classification.inScope || !classification.steps.length) {
     printSection(
@@ -203,11 +202,27 @@ async function main() {
   const result = await executeSteps(classification.steps, fetchFn)
 
   if (result.success) {
+    // Poll for async results (e.g. Imference returns { request_id } and image is ready later)
+    for (let i = 0; i < result.results.length; i++) {
+      const r = result.results[i]
+      if (r?.request_id && classification.steps[i]?.service === "Imference") {
+        print(`  ⏳ Image generating… (request_id: ${r.request_id})`)
+        const imageUrl = await pollImferenceResult(r.request_id)
+        if (imageUrl) {
+          result.results[i] = { ...r, url: imageUrl }
+          print(`  ✓ Image ready: ${imageUrl}`)
+        } else {
+          print(`  ⚠ Image generation timed out — check back with request_id: ${r.request_id}`)
+        }
+      }
+    }
+
     printSection("✓ Done", result.uxMessage)
     print("")
     result.results.forEach((r, i) => {
       print(`  Step ${i + 1} result:`)
-      print("  " + JSON.stringify(r, null, 2).replace(/\n/g, "\n  "))
+      const body = r !== undefined ? JSON.stringify(r, null, 2) : "(binary or empty response)"
+      print("  " + body.replace(/\n/g, "\n  "))
       print("")
     })
   } else {

@@ -34,23 +34,6 @@
 
 import "dotenv/config"
 
-// ---------------------------------------------------------------------------
-// Debug: log all requests/responses to the CDP facilitator.
-// Remove once the payment flow is confirmed working.
-// ---------------------------------------------------------------------------
-const _originalFetch = globalThis.fetch
-globalThis.fetch = async function debugFetch(input, init) {
-  const url = typeof input === "string" ? input : (input as Request).url
-  const isCdp = url.includes("cdp.coinbase.com")
-  if (isCdp) console.log(`[CDP →] ${init?.method ?? "GET"} ${url}`)
-  const response = await _originalFetch(input as any, init)
-  if (isCdp) {
-    const body = await response.clone().text().catch(() => "<unreadable>")
-    console.log(`[CDP ←] ${response.status} ${response.statusText} — ${body.slice(0, 800)}`)
-  }
-  return response
-} as typeof fetch
-
 import express from "express"
 import {
   paymentMiddleware,
@@ -211,15 +194,4 @@ app.use(router)
 // ---------------------------------------------------------------------------
 // Start listening
 // ---------------------------------------------------------------------------
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`)
-  console.log(
-    `  POST http://localhost:${PORT}/api/protected-create-encryption-session`
-  )
-  console.log(
-    `  GET  http://localhost:${PORT}/api/protected-content  [x402 protected]`
-  )
-  console.log(
-    `  Network: ${X402_NETWORK}  |  Pay to: ${PAY_TO_ADDRESS}  |  Amount: $${X402_MAX_AMOUNT} USD`
-  )
-})
+app.listen(PORT)

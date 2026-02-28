@@ -1,7 +1,6 @@
 import type { TaskStep } from "../classifier/classifier.js"
 import type { FetchResult } from "../services/fetchWithPayment.js"
 import { ServiceRegistry, defaultRegistry } from "../registry/serviceRegistry.js"
-import { logger } from "../utils/logger.js"
 import { classifyError, uxMessageForError } from "../utils/errorHandling.js"
 
 // Re-export so callers can import registry + error types from one place
@@ -230,7 +229,6 @@ export async function executeSteps(
     const url = config?.url ?? `https://api.ledgerling.io/${step.service.toLowerCase()}`
     const stepNum = results.length + 1
 
-    logger.info(`Step ${stepNum}/${steps.length}: calling ${step.service}`, { url })
 
     const fetchPromise = fetchFn(url, {
       method: "POST",
@@ -268,11 +266,6 @@ export async function executeSteps(
           ? `Note: ${results.length} prior step${results.length !== 1 ? "s" : ""} succeeded and already incurred $${totalCost.toFixed(4)} in charges. x402 payments are non-reversible.`
           : "No charges were incurred before this failure."
 
-      logger.error(`Step ${stepNum} (${step.service}) failed`, {
-        kind: errKind,
-        error: result.error,
-      })
-
       return {
         success: false,
         results,
@@ -293,7 +286,6 @@ export async function executeSteps(
     results.push(result.result)
     totalCost += stepCost
 
-    logger.info(`${step.service} OK`, { cost: stepCost })
   }
 
   return {

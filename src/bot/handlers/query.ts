@@ -180,8 +180,7 @@ export async function handleQuery(ctx: Context): Promise<void> {
         ],
       },
     });
-  } catch (error: any) {
-    console.error("Query handler error:", error);
+  } catch {
     await ctx.reply(ERROR_MESSAGE);
   } finally {
     activeQueries.delete(userId);
