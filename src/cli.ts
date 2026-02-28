@@ -6,6 +6,9 @@
  *   npm run cli                          # interactive prompt
  *   npm run cli "scrape https://example.com"
  *   npm run cli -- --dry-run "get USDC price"
+ *
+ * The payer identity is set via CLI_USER_ID in .env (defaults to "default").
+ * Each user ID maps to a dedicated Openfort backend wallet stored in wallets.json.
  */
 
 import "dotenv/config"
@@ -14,7 +17,7 @@ import { stdin as input, stdout as output } from "node:process"
 import { buildFetchWithPayment } from "./services/fetchWithPayment.js"
 import { classifyRequest, FALLBACK_MESSAGE } from "./classifier/classifier.js"
 import { estimateExecution, executeSteps } from "./orchestrator/orchestrator.js"
-import { createOpenfortSigner } from "./services/openfortSigner.js"
+import { getOrCreateUserSigner } from "./services/userSigner.js"
 import { ethers } from "ethers"
 import type { MatchContext } from "./classifier/types.js"
 
@@ -27,6 +30,9 @@ const queryArg = args
   .filter((a) => !a.startsWith("--"))
   .join(" ")
   .trim()
+
+// The user ID that owns the paying wallet. Set CLI_USER_ID in .env.
+const CLI_USER_ID = process.env.CLI_USER_ID ?? "default"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,23 +62,24 @@ async function showWallet() {
     return null
   }
 
-  let address: string
+  let signer: Awaited<ReturnType<typeof getOrCreateUserSigner>>
   try {
-    const signer = await createOpenfortSigner()
-    address = signer.address
+    signer = await getOrCreateUserSigner(CLI_USER_ID)
   } catch (err: any) {
     console.error("[Openfort debug]", err)
-    print(`❌ Could not load Openfort wallet: ${err.message}`)
+    print(`❌ Could not load wallet for user "${CLI_USER_ID}": ${err.message}`)
     return null
   }
 
+  const { address } = signer
   const chainId = Number(process.env.CHAIN_ID)
   const rpcUrl = process.env.RPC_URL ?? "https://mainnet.base.org"
   const provider = new ethers.JsonRpcProvider(rpcUrl, chainId)
 
   print("\n🚀 Openfort wallet detected:")
+  print(`👤 User:    ${CLI_USER_ID}`)
   print(`💳 Address: ${address}`)
-  print(`⛓ Chain: ${chainId}`)
+  print(`⛓ Chain:   ${chainId}`)
 
   try {
     const USDC_ADDRESS = process.env.USDC_ADDRESS ?? process.env.X402_ASSET_ADDRESS ?? ""
@@ -91,7 +98,7 @@ async function showWallet() {
     print(`⚠ Could not fetch USDC balance: ${err.message}`)
   }
 
-  return { address }
+  return { address, signer }
 }
 
 // ---------------------------------------------------------------------------
@@ -119,8 +126,8 @@ async function main() {
 
   // 3️⃣ Build MatchContext with wallet prefilled
   const ctx: MatchContext = {
-    urls: [], // will be filled later if user provides URL
-    walletAddresses: wallet ? [wallet.address] : [],  // address from Openfort
+    urls: [],
+    walletAddresses: wallet ? [wallet.address] : [],
     ipAddresses: [],
     cryptoSymbols: [],
     raw: query
@@ -174,10 +181,16 @@ async function main() {
     process.exit(0)
   }
 
-  // 8️⃣ Build fetchFn with x402 payment
+  // 8️⃣ Build fetchFn with x402 payment using the user's wallet
+  if (!wallet) {
+    print("\n  ✗ No wallet available. Cannot proceed.\n")
+    rl.close()
+    process.exit(1)
+  }
+
   let fetchFn: Awaited<ReturnType<typeof buildFetchWithPayment>>
   try {
-    fetchFn = await buildFetchWithPayment()
+    fetchFn = await buildFetchWithPayment(wallet.signer)
   } catch (err: any) {
     print(`\n  ✗ Wallet error: ${err.message}`)
     print("  Check your .env (OPENFORT_SECRET_KEY).\n")

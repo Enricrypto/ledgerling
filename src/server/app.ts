@@ -33,8 +33,30 @@
  */
 
 import "dotenv/config"
+
+// ---------------------------------------------------------------------------
+// Debug: log all requests/responses to the CDP facilitator.
+// Remove once the payment flow is confirmed working.
+// ---------------------------------------------------------------------------
+const _originalFetch = globalThis.fetch
+globalThis.fetch = async function debugFetch(input, init) {
+  const url = typeof input === "string" ? input : (input as Request).url
+  const isCdp = url.includes("cdp.coinbase.com")
+  if (isCdp) console.log(`[CDP →] ${init?.method ?? "GET"} ${url}`)
+  const response = await _originalFetch(input as any, init)
+  if (isCdp) {
+    const body = await response.clone().text().catch(() => "<unreadable>")
+    console.log(`[CDP ←] ${response.status} ${response.statusText} — ${body.slice(0, 800)}`)
+  }
+  return response
+} as typeof fetch
+
 import express from "express"
-import { paymentMiddleware, x402ResourceServer, type Network } from "@x402/express"
+import {
+  paymentMiddleware,
+  x402ResourceServer,
+  type Network
+} from "@x402/express"
 import { ExactEvmScheme } from "@x402/evm/exact/server"
 import { HTTPFacilitatorClient } from "@x402/core/server"
 import { generateJwt } from "@coinbase/cdp-sdk/auth"
@@ -52,10 +74,14 @@ const COINBASE_SECRET_KEY = process.env.COINBASE_SECRET_KEY
 const PORT = Number(process.env.PORT ?? "3000")
 
 if (!PAY_TO_ADDRESS) throw new Error("Missing env var: PAY_TO_ADDRESS")
-if (!X402_NETWORK) throw new Error("Missing env var: X402_NETWORK (e.g. eip155:8453)")
-if (!X402_MAX_AMOUNT) throw new Error("Missing env var: X402_MAX_AMOUNT (e.g. 0.10)")
-if (!COINBASE_API_KEY_ID) throw new Error("Missing env var: COINBASE_API_KEY_ID")
-if (!COINBASE_SECRET_KEY) throw new Error("Missing env var: COINBASE_SECRET_KEY")
+if (!X402_NETWORK)
+  throw new Error("Missing env var: X402_NETWORK (e.g. eip155:8453)")
+if (!X402_MAX_AMOUNT)
+  throw new Error("Missing env var: X402_MAX_AMOUNT (e.g. 0.10)")
+if (!COINBASE_API_KEY_ID)
+  throw new Error("Missing env var: COINBASE_API_KEY_ID")
+if (!COINBASE_SECRET_KEY)
+  throw new Error("Missing env var: COINBASE_SECRET_KEY")
 
 // ---------------------------------------------------------------------------
 // Step 1: Create the CDP facilitator client for Base mainnet.
@@ -83,14 +109,14 @@ const CDP_FACILITATOR_URL = `https://${CDP_FACILITATOR_HOST}${CDP_FACILITATOR_BA
  */
 async function cdpAuthHeader(
   method: string,
-  path: string,
+  path: string
 ): Promise<Record<string, string>> {
   const token = await generateJwt({
     apiKeyId: COINBASE_API_KEY_ID!,
     apiKeySecret: COINBASE_SECRET_KEY!,
     requestMethod: method,
     requestHost: CDP_FACILITATOR_HOST,
-    requestPath: `${CDP_FACILITATOR_BASE}${path}`,
+    requestPath: `${CDP_FACILITATOR_BASE}${path}`
   })
   return { Authorization: `Bearer ${token}` }
 }
@@ -102,8 +128,8 @@ const facilitator = new HTTPFacilitatorClient({
   createAuthHeaders: async () => ({
     verify: await cdpAuthHeader("POST", "/verify"),
     settle: await cdpAuthHeader("POST", "/settle"),
-    supported: await cdpAuthHeader("GET", "/supported"),
-  }),
+    supported: await cdpAuthHeader("GET", "/supported")
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -117,7 +143,7 @@ const facilitator = new HTTPFacilitatorClient({
 // ---------------------------------------------------------------------------
 const resourceServer = new x402ResourceServer(facilitator).register(
   X402_NETWORK as Network,
-  new ExactEvmScheme(),
+  new ExactEvmScheme()
 )
 
 // ---------------------------------------------------------------------------
@@ -146,12 +172,12 @@ const protectedRoutes = {
         price: `$${X402_MAX_AMOUNT}`,
         network: X402_NETWORK as Network,
         payTo: PAY_TO_ADDRESS,
-        maxTimeoutSeconds: Number(X402_TIMEOUT),
-      },
+        maxTimeoutSeconds: Number(X402_TIMEOUT)
+      }
     ],
     description: "Access to protected content",
-    mimeType: "application/json",
-  },
+    mimeType: "application/json"
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -188,12 +214,12 @@ app.use(router)
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`)
   console.log(
-    `  POST http://localhost:${PORT}/api/protected-create-encryption-session`,
+    `  POST http://localhost:${PORT}/api/protected-create-encryption-session`
   )
   console.log(
-    `  GET  http://localhost:${PORT}/api/protected-content  [x402 protected]`,
+    `  GET  http://localhost:${PORT}/api/protected-content  [x402 protected]`
   )
   console.log(
-    `  Network: ${X402_NETWORK}  |  Pay to: ${PAY_TO_ADDRESS}  |  Amount: $${X402_MAX_AMOUNT} USD`,
+    `  Network: ${X402_NETWORK}  |  Pay to: ${PAY_TO_ADDRESS}  |  Amount: $${X402_MAX_AMOUNT} USD`
   )
 })

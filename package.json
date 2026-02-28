@@ -14,7 +14,8 @@
     "test:bot": "npx tsx src/bot/test-orchestrator.ts",
     "build": "tsc",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
-    "test:live": "LIVE_TEST=1 node --experimental-vm-modules node_modules/.bin/jest src/e2e"
+    "test:live": "LIVE_TEST=1 node --experimental-vm-modules node_modules/.bin/jest src/e2e",
+    "test:payment": "npx tsx src/test-payment.ts"
   },
   "keywords": [],
   "author": "",

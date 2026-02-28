@@ -14,6 +14,7 @@
 
 import { Router, type Request, type Response } from "express"
 import Openfort from "@openfort/openfort-node"
+import { getOrCreateUserSigner, getUserWalletAddress } from "../services/userSigner.js"
 
 // ---------------------------------------------------------------------------
 // Validate required env vars at module load time so the server fails fast
@@ -122,3 +123,68 @@ router.get("/api/protected-content", (_req: Request, res: Response): void => {
     timestamp: new Date().toISOString(),
   })
 })
+
+// ---------------------------------------------------------------------------
+// POST /api/users/wallet
+// ---------------------------------------------------------------------------
+/**
+ * Creates (or retrieves) an Openfort backend wallet for a user.
+ *
+ * Idempotent — calling this multiple times with the same userId always
+ * returns the same wallet address.
+ *
+ * Request body:  { "userId": "<string>" }
+ * Response body: { "userId": "<string>", "address": "0x..." }
+ *
+ * Errors:
+ *   400 – userId missing or not a string
+ *   500 – Openfort SDK error
+ */
+router.post(
+  "/api/users/wallet",
+  async (req: Request, res: Response): Promise<void> => {
+    const { userId } = req.body as { userId?: unknown }
+
+    if (typeof userId !== "string" || !userId.trim()) {
+      res.status(400).json({ error: "Missing or invalid field: userId (must be a non-empty string)" })
+      return
+    }
+
+    try {
+      const signer = await getOrCreateUserSigner(userId.trim())
+      res.json({ userId: userId.trim(), address: signer.address })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Wallet creation failed"
+      res.status(500).json({ error: message })
+    }
+  },
+)
+
+// ---------------------------------------------------------------------------
+// GET /api/users/:userId/wallet
+// ---------------------------------------------------------------------------
+/**
+ * Returns the stored wallet address for a user without making any Openfort
+ * API calls. Fast read from the local wallet store.
+ *
+ * Response body: { "userId": "<string>", "address": "0x..." }
+ *
+ * Errors:
+ *   404 – no wallet found for this userId (call POST /api/users/wallet first)
+ */
+router.get(
+  "/api/users/:userId/wallet",
+  (req: Request<{ userId: string }>, res: Response): void => {
+    const { userId } = req.params
+    const address = getUserWalletAddress(userId)
+
+    if (!address) {
+      res.status(404).json({
+        error: `No wallet found for user "${userId}". Call POST /api/users/wallet to create one.`,
+      })
+      return
+    }
+
+    res.json({ userId, address })
+  },
+)

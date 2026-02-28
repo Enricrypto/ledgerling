@@ -3,7 +3,7 @@ import { registerExactEvmScheme } from "@x402/evm/exact/client"
 import type { ClientEvmSigner } from "@x402/evm"
 import { createPublicClient, http } from "viem"
 import { base, baseSepolia } from "viem/chains"
-import { createOpenfortSigner, type EvmSignerLike } from "./openfortSigner.js"
+import type { EvmSignerLike } from "./openfortSigner.js"
 
 export interface FetchResult {
   success: boolean
@@ -14,20 +14,19 @@ export interface FetchResult {
 }
 
 /**
- * Builds a ready-to-use fetchWithPayment function.
+ * Builds a ready-to-use fetchWithPayment function for a specific user signer.
  *
- * Mode is selected automatically based on which env var is present:
- *   OPENFORT_SECRET_KEY  →  OpenFort TEE backend wallet (demo + production path)
- *   EVM_PRIVATE_KEY      →  Raw private key via viem (quick local testing only)
+ * The caller is responsible for supplying a signer — typically obtained via
+ * getOrCreateUserSigner(userId) from services/userSigner.ts.
+ *
+ * The system wallet (PAY_TO_ADDRESS) is the payment *recipient*, not the payer.
+ * Never pass the system signer here.
  *
  * Chain is selected via CHAIN_ID (default: 84532 = Base Sepolia testnet).
  * Override the RPC endpoint with RPC_URL if needed.
- *
- * Call once at server startup and reuse the returned function for all requests.
  */
-export async function buildFetchWithPayment() {
-  const signerLike = await resolveSigner()
-  const clientSigner = buildClientSigner(signerLike)
+export async function buildFetchWithPayment(signer: EvmSignerLike) {
+  const clientSigner = buildClientSigner(signer)
 
   const x402 = new x402Client()
   registerExactEvmScheme(x402, { signer: clientSigner })
@@ -66,13 +65,6 @@ export async function buildFetchWithPayment() {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-async function resolveSigner(): Promise<EvmSignerLike> {
-  if (!process.env.OPENFORT_SECRET_KEY) {
-    throw new Error("Missing env var: OPENFORT_SECRET_KEY")
-  }
-  return createOpenfortSigner()
-}
 
 /**
  * Composes a ClientEvmSigner from a minimal signer + a viem public client.
