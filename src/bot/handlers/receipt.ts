@@ -14,7 +14,17 @@ export async function handleReceiptCallback(ctx: Context): Promise<void> {
     return;
   }
 
-  const lines = ["🧾 Receipt", ""];
+  // Don't show receipt if nothing was charged
+  const totalCost = session.lastSteps
+    .filter((s) => s && s.status !== "error")
+    .reduce((sum, s) => sum + s.costUsd, 0);
+
+  if (totalCost < 0.001) {
+    await ctx.reply("Don't worry, you were not charged for this.");
+    return;
+  }
+
+  const lines = ["Receipt", ""];
 
   let total = 0;
   for (const step of session.lastSteps) {
@@ -33,8 +43,6 @@ export async function handleReceiptCallback(ctx: Context): Promise<void> {
   }
 
   lines.push(`Total: $${total.toFixed(3)}`);
-  lines.push("━━━━━━━━━━━━━━━");
-  lines.push("Settled on Base L2 via x402 protocol");
 
   // Send as plain text (no MarkdownV2 to avoid escaping links)
   await ctx.reply(lines.join("\n"));

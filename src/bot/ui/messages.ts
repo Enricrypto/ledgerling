@@ -22,8 +22,7 @@ export function getWelcomeMessage(): string {
   return `Hi, how can I help you ${timeOfDay}?`;
 }
 
-export const HELP_MESSAGE = `🤖 AlmaBot Help
-
+export const HELP_MESSAGE = `
 I can help you with:
 • Research & web scraping
 • Market & news intelligence
@@ -35,21 +34,19 @@ I can help you with:
 Just ask me anything in plain language!
 
 Commands:
-/start — See welcome message
-/balance — Check remaining credits
-/help — Show this message`;
+/start 
+/balance 
+/help`;
 
-export const OUT_OF_CREDITS_MESSAGE = `💰 You're out of credits! This was a demo — thanks for trying AlmaBot.`;
+export const EVALUATING_MESSAGE = "Evaluating...";
 
-export const STILL_WORKING_MESSAGE = `⏳ Still working on your last request...`;
+export const UNSUPPORTED_REQUEST_MESSAGE =
+  "I'm sorry, I don't support this type of request yet. Would you like to see what I can help with?";
 
-export const ERROR_MESSAGE = `Something went wrong on my end. Try again, or try a simpler question?`;
+export const OUT_OF_CREDITS_MESSAGE = `You're out of credits. Thanks for trying Alma — hope it was helpful!`;
+
+export const STILL_WORKING_MESSAGE = `Still working on your last request...`;
+
+export const ERROR_MESSAGE = `Sorry, something went wrong. Please try again?`;
 
 export const NON_TEXT_MESSAGE = `I can only process text messages right now. Type your question!`;
-
-export function queryCountMessage(count: number): string {
-  if (count === 1) return "This was your first query!";
-  if (count === 5) return "That's 5 queries — you're getting the hang of it!";
-  if (count === 10) return "10 queries! You're a power user 🚀";
-  return "";
-}
